@@ -14,10 +14,51 @@ const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
 export async function getWhatsAppInstances(projectId: string) {
   await requireProjectAccess(projectId);
-  return prisma.whatsAppInstance.findMany({
+  
+  const instances = await prisma.whatsAppInstance.findMany({
     where: { projectId },
     orderBy: { createdAt: 'desc' },
   });
+
+  // Sincroniza em tempo real o status com a Evolution API se estiver configurado
+  if (EVOLUTION_API_URL && EVOLUTION_API_KEY) {
+    try {
+      const updatedInstances = await Promise.all(
+        instances.map(async (inst) => {
+          if (inst.type !== 'WHATSAPP') return inst;
+          try {
+            const response = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${inst.instanceName}`, {
+              method: 'GET',
+              headers: {
+                'apikey': EVOLUTION_API_KEY,
+              },
+            });
+            if (response.ok) {
+              const data = await response.json();
+              const evolutionState = data.instance?.state;
+              const newStatus = evolutionState === 'open' ? 'CONNECTED' : 'DISCONNECTED';
+              
+              if (inst.status !== newStatus) {
+                const updated = await prisma.whatsAppInstance.update({
+                  where: { id: inst.id },
+                  data: { status: newStatus },
+                });
+                return updated;
+              }
+            }
+          } catch (err) {
+            console.error(`Erro ao sincronizar status da instância ${inst.instanceName}:`, err);
+          }
+          return inst;
+        })
+      );
+      return updatedInstances;
+    } catch (err) {
+      console.error('Erro na sincronização de instâncias:', err);
+    }
+  }
+
+  return instances;
 }
 
 export async function createWhatsAppInstance(projectId: string, name: string, type: string = 'WHATSAPP') {

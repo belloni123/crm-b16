@@ -42,6 +42,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Instância não cadastrada no sistema.' }, { status: 404 });
     }
 
+    // Tratamento de atualização de status da conexão (Evolution API webhook)
+    if (event === 'connection.update' || event === 'CONNECTION_UPDATE') {
+      const state = data?.state || data?.status;
+      const newStatus = state === 'open' ? 'CONNECTED' : 'DISCONNECTED';
+      await prisma.whatsAppInstance.update({
+        where: { id: instance.id },
+        data: { status: newStatus },
+      });
+      return NextResponse.json({ success: true, message: `Status da instância atualizado para ${newStatus}` });
+    }
+
     // Só processa se o evento for de criação de mensagem ou se não houver evento (envio direto para testes)
     if (event && event !== 'messages.upsert' && event !== 'messages.update' && event !== 'MESSAGES_UPSERT') {
       return NextResponse.json({ success: true, message: `Evento ignorado: ${event}` });
