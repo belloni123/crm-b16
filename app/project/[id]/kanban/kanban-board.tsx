@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { startWhatsAppConversation } from '@/app/actions/whatsapp';
 import { 
   moveLead, 
   createLead, 
@@ -115,7 +117,8 @@ export function KanbanBoard({
   origins, 
   lostStatuses 
 }: KanbanBoardProps) {
-  const router = React.useMemo(() => null, []); // Placeholder
+  const router = useRouter();
+  const [isStartingChat, setIsStartingChat] = useState(false);
   const [pipelines] = useState<Pipeline[]>(initialPipelines);
   const [activePipeline, setActivePipeline] = useState<Pipeline | null>(pipelines[0] || null);
   
@@ -505,6 +508,24 @@ export function KanbanBoard({
       console.error(err);
     } finally {
       setIsSavingCustomFields(false);
+    }
+  };
+
+  const handleStartChat = async () => {
+    if (!leadDetail) return;
+    setIsStartingChat(true);
+    try {
+      const res = await startWhatsAppConversation(projectId, leadDetail.id);
+      if (res.success && res.conversationId) {
+        router.push(`/project/${projectId}/inbox?selected=${res.conversationId}`);
+      } else {
+        alert(res.message || 'Erro ao iniciar conversa');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Erro ao iniciar conversa');
+    } finally {
+      setIsStartingChat(false);
     }
   };
 
@@ -992,7 +1013,26 @@ export function KanbanBoard({
                       </div>
                       <div>
                         <span className="text-[10px] text-text-secondary block font-semibold">WHATSAPP</span>
-                        <span className="text-white font-medium">{leadDetail.phone || '—'}</span>
+                        {leadDetail.phone ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-white font-medium">{leadDetail.phone}</span>
+                            <button
+                              onClick={handleStartChat}
+                              disabled={isStartingChat}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent/20 hover:bg-accent/40 border border-accent/30 text-accent text-[10px] font-bold rounded cursor-pointer transition-all disabled:opacity-50"
+                              title="Conversar no WhatsApp"
+                            >
+                              {isStartingChat ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <MessageSquare className="h-3 w-3" />
+                              )}
+                              Conversar
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-white font-medium">—</span>
+                        )}
                       </div>
                       <div>
                         <span className="text-[10px] text-text-secondary block font-semibold">E-MAIL</span>
@@ -1205,7 +1245,7 @@ export function KanbanBoard({
               <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden divide-y md:divide-y-0 md:divide-x divide-[rgba(255,255,255,0.05)]">
                 
                 {/* Linha do tempo de atividades (Timeline) */}
-                <div className="flex-1 p-6 flex flex-col h-full overflow-hidden">
+                <div className="flex-1 p-6 flex flex-col min-h-0 overflow-hidden">
                   <h3 className="text-xs font-bold text-accent uppercase tracking-wider mb-4 flex items-center gap-1.5 flex-shrink-0">
                     <Clock className="h-4 w-4" />
                     Histórico & Linha do Tempo
@@ -1265,7 +1305,7 @@ export function KanbanBoard({
                 </div>
 
                 {/* Checklist de Tarefas do Lead */}
-                <div className="w-full md:w-80 p-6 flex flex-col h-full overflow-hidden">
+                <div className="w-full md:w-80 p-6 flex flex-col min-h-0 overflow-hidden">
                   <h3 className="text-xs font-bold text-accent uppercase tracking-wider mb-4 flex items-center gap-1.5 flex-shrink-0">
                     <CheckSquare className="h-4 w-4" />
                     Ações & Tarefas

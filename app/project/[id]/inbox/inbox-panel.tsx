@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { 
   getWhatsAppConversations, 
   getWhatsAppMessages, 
@@ -80,6 +81,15 @@ interface InboxPanelProps {
 export function InboxPanel({ projectId, initialConversations, whatsappInstances, leads }: InboxPanelProps) {
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const selectedParam = searchParams?.get('selected') || null;
+
+  useEffect(() => {
+    if (selectedParam) {
+      setSelectedConversationId(selectedParam);
+    }
+  }, [selectedParam]);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [inputText, setInputText] = useState('');

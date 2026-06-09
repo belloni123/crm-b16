@@ -372,3 +372,66 @@ export async function associateLeadToConversation(projectId: string, conversatio
   return updatedConversation;
 }
 
+export async function startWhatsAppConversation(projectId: string, leadId: string) {
+  await requireProjectAccess(projectId);
+
+  // 1. Busca o lead e valida
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+  });
+
+  if (!lead || lead.projectId !== projectId) {
+    throw new Error('Lead não encontrado.');
+  }
+
+  if (!lead.phone) {
+    return { success: false, message: 'Este lead não possui telefone cadastrado.' };
+  }
+
+  const cleanPhone = lead.phone.replace(/\D/g, '');
+  if (!cleanPhone) {
+    return { success: false, message: 'Telefone do lead inválido.' };
+  }
+
+  // 2. Busca a primeira instância de WhatsApp ativa (conectada) do projeto
+  const instance = await prisma.whatsAppInstance.findFirst({
+    where: { 
+      projectId, 
+      status: 'CONNECTED',
+      type: 'WHATSAPP'
+    },
+  });
+
+  if (!instance) {
+    return { success: false, message: 'Nenhuma conexão de WhatsApp ativa neste projeto. Vá em Configurações > Conexões WhatsApp para conectar.' };
+  }
+
+  // 3. Verifica se a conversa já existe
+  let conversation = await prisma.conversation.findFirst({
+    where: {
+      whatsappId: cleanPhone,
+      instanceId: instance.id,
+    },
+  });
+
+  // 4. Se não existe, cria a conversa
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: {
+        whatsappId: cleanPhone,
+        name: lead.name,
+        instanceId: instance.id,
+        leadId: lead.id,
+      },
+    });
+  } else if (!conversation.leadId) {
+    // Se a conversa existia mas não estava vinculada ao lead, vincula agora
+    conversation = await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { leadId: lead.id },
+    });
+  }
+
+  return { success: true, conversationId: conversation.id };
+}
+

@@ -17,6 +17,8 @@ import {
   importLeadsAction,
   batchDeleteLeadsAction
 } from '@/app/actions/crm';
+import { useRouter } from 'next/navigation';
+import { startWhatsAppConversation } from '@/app/actions/whatsapp';
 import { 
   Search, 
   Filter, 
@@ -35,7 +37,8 @@ import {
   Calendar,
   CheckCircle2,
   Circle,
-  FileText
+  FileText,
+  MessageSquare
 } from 'lucide-react';
 
 interface Pipeline {
@@ -134,6 +137,8 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
   // Detalhes do Lead
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [leadDetail, setLeadDetail] = useState<any | null>(null);
+  const router = useRouter();
+  const [isStartingChat, setIsStartingChat] = useState(false);
 
   // Estados para Operações em Lote
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
@@ -330,6 +335,24 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
       console.error(err);
     } finally {
       setIsSavingCustomFields(false);
+    }
+  };
+
+  const handleStartChat = async () => {
+    if (!leadDetail) return;
+    setIsStartingChat(true);
+    try {
+      const res = await startWhatsAppConversation(projectId, leadDetail.id);
+      if (res.success && res.conversationId) {
+        router.push(`/project/${projectId}/inbox?selected=${res.conversationId}`);
+      } else {
+        alert(res.message || 'Erro ao iniciar conversa');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Erro ao iniciar conversa');
+    } finally {
+      setIsStartingChat(false);
     }
   };
 
@@ -1183,7 +1206,26 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
                       </div>
                       <div>
                         <span className="text-[10px] text-text-secondary block font-semibold">WHATSAPP</span>
-                        <span className="text-white font-medium">{leadDetail.phone || '—'}</span>
+                        {leadDetail.phone ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-white font-medium">{leadDetail.phone}</span>
+                            <button
+                              onClick={handleStartChat}
+                              disabled={isStartingChat}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent/20 hover:bg-accent/40 border border-accent/30 text-accent text-[10px] font-bold rounded cursor-pointer transition-all disabled:opacity-50"
+                              title="Conversar no WhatsApp"
+                            >
+                              {isStartingChat ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <MessageSquare className="h-3 w-3" />
+                              )}
+                              Conversar
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-white font-medium">—</span>
+                        )}
                       </div>
                       <div>
                         <span className="text-[10px] text-text-secondary block font-semibold">E-MAIL</span>
@@ -1395,7 +1437,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
               <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden divide-y md:divide-y-0 md:divide-x divide-[rgba(255,255,255,0.05)]">
                 
                 {/* Atividades */}
-                <div className="flex-1 p-6 flex flex-col h-full overflow-hidden">
+                <div className="flex-1 p-6 flex flex-col min-h-0 overflow-hidden">
                   <h3 className="text-xs font-bold text-accent uppercase tracking-wider mb-4 flex items-center gap-1.5 flex-shrink-0">
                     <Clock className="h-4 w-4" />
                     Histórico & Linha do Tempo
@@ -1453,7 +1495,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
                 </div>
 
                 {/* Tarefas */}
-                <div className="w-full md:w-80 p-6 flex flex-col h-full overflow-hidden">
+                <div className="w-full md:w-80 p-6 flex flex-col min-h-0 overflow-hidden">
                   <h3 className="text-xs font-bold text-accent uppercase tracking-wider mb-4 flex items-center gap-1.5 flex-shrink-0">
                     <CheckSquare className="h-4 w-4" />
                     Ações & Tarefas
