@@ -162,7 +162,7 @@ export default async function ProjectLayout({ children, params }: Props) {
       </aside>
 
       {/* CONTEÚDO PRINCIPAL */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto relative z-10">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto relative">
         {children}
       </main>
     </div>

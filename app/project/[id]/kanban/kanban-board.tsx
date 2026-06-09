@@ -626,7 +626,7 @@ export function KanbanBoard({
       </div>
 
       {/* Board Kanban */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 bg-[linear-gradient(to_bottom,transparent,rgba(10,20,13,0.2))]">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 bg-[linear-gradient(to_bottom,transparent,var(--accent-glow))]">
         <div className="flex gap-4 items-start h-full pb-4">
           
           {activeStages.map((stage) => {
@@ -640,7 +640,7 @@ export function KanbanBoard({
                 onDragOver={(e) => handleDragOver(e, stage.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, stage.id)}
-                className={`w-72 max-h-full flex flex-col bg-[rgba(10,15,11,0.2)] backdrop-blur-sm border rounded-xl transition-all duration-150 flex-shrink-0 ${
+                className={`w-72 max-h-full flex flex-col bg-dark-glass-2 backdrop-blur-sm border rounded-xl transition-all duration-150 flex-shrink-0 ${
                   isOver 
                     ? 'border-accent bg-accent-glow' 
                     : 'border-border-subtle'
@@ -704,7 +704,7 @@ export function KanbanBoard({
                         </div>
 
                         {/* Value and stats */}
-                        <div className="flex items-center justify-between pt-1 border-t border-[rgba(255,255,255,0.02)]">
+                        <div className="flex items-center justify-between pt-1 border-t border-border-subtle">
                           <span className="text-xs font-black text-accent-light">
                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(lead.value)}
                           </span>
@@ -1242,7 +1242,7 @@ export function KanbanBoard({
                       <button
                         onClick={handleSaveCustomFields}
                         disabled={isSavingCustomFields}
-                        className="w-full py-1.5 bg-glass-3 hover:bg-[rgba(255,255,255,0.06)] border border-border-subtle hover:border-text-secondary text-white font-bold text-xs rounded transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                        className="w-full py-1.5 bg-glass-3 hover:bg-glass-5 border border-border-subtle hover:border-text-secondary text-white font-bold text-xs rounded transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
                         {isSavingCustomFields && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                         Salvar Campos
@@ -1254,7 +1254,7 @@ export function KanbanBoard({
               </div>
 
               {/* Central: Histórico de Linha do tempo e Tarefas */}
-              <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden divide-y md:divide-y-0 md:divide-x divide-[rgba(255,255,255,0.05)]">
+              <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden divide-y md:divide-y-0 md:divide-x divide-border-subtle">
                 
                 {/* Linha do tempo de atividades (Timeline) */}
                 <div className="flex-1 p-6 flex flex-col min-h-0 overflow-hidden">
@@ -1361,7 +1361,7 @@ export function KanbanBoard({
                             key={task.id} 
                             className={`flex items-start gap-2.5 p-3 rounded-lg border text-xs transition-all ${
                               isCompleted 
-                                ? 'bg-glass-1 border-[rgba(255,255,255,0.03)] opacity-60' 
+                                ? 'bg-glass-1 border-border-subtle opacity-60' 
                                 : 'bg-glass-2 border-border-subtle hover:border-border-glass'
                             }`}
                           >

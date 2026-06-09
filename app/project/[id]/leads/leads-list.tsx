@@ -738,7 +738,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
           )}
           <button
             onClick={() => setShowImportModal(true)}
-            className="px-3 py-2 bg-glass-3 hover:bg-[rgba(255,255,255,0.06)] border border-border-subtle hover:border-text-secondary text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 bg-glass-3 hover:bg-glass-5 border border-border-subtle hover:border-text-secondary text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
           >
             Importar CSV
           </button>
@@ -1435,7 +1435,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
                       <button
                         onClick={handleSaveCustomFields}
                         disabled={isSavingCustomFields}
-                        className="w-full py-1.5 bg-glass-3 hover:bg-[rgba(255,255,255,0.06)] border border-border-subtle hover:border-text-secondary text-white font-bold text-xs rounded transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                        className="w-full py-1.5 bg-glass-3 hover:bg-glass-5 border border-border-subtle hover:border-text-secondary text-white font-bold text-xs rounded transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
                         {isSavingCustomFields && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                         Salvar Campos
@@ -1446,7 +1446,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
               </div>
 
               {/* Central: Histórico e Tarefas */}
-              <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden divide-y md:divide-y-0 md:divide-x divide-[rgba(255,255,255,0.05)]">
+              <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden divide-y md:divide-y-0 md:divide-x divide-border-subtle">
                 
                 {/* Atividades */}
                 <div className="flex-1 p-6 flex flex-col min-h-0 overflow-hidden">
@@ -1651,7 +1651,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
                       <span className="text-xs font-bold text-danger uppercase tracking-wider block">Relatório de Erros ({importResult.errors.length})</span>
                       <div className="bg-bg-base border border-border-subtle rounded-xl p-3 max-h-40 overflow-y-auto space-y-1.5 custom-scrollbar">
                         {importResult.errors.map((err, idx) => (
-                          <div key={idx} className="text-xs flex gap-2 justify-between border-b border-[rgba(255,255,255,0.02)] pb-1.5 last:border-0 last:pb-0">
+                          <div key={idx} className="text-xs flex gap-2 justify-between border-b border-border-subtle pb-1.5 last:border-0 last:pb-0">
                             <span className="font-bold text-white">Linha {err.line}</span>
                             <span className="text-text-secondary truncate max-w-xs">{err.error}</span>
                           </div>
@@ -1784,7 +1784,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
                             }
                           </tr>
                         </thead>
-                        <tbody className="text-text-secondary divide-y divide-[rgba(255,255,255,0.02)]">
+                        <tbody className="text-text-secondary divide-y divide-border-subtle">
                           {getMappedPreviewRows().length === 0 ? (
                             <tr>
                               <td colSpan={targetFields.length} className="p-4 text-center text-text-tertiary">
