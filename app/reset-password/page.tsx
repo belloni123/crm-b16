@@ -152,7 +152,7 @@ function ResetPasswordForm() {
                 <Button
                   type="submit"
                   disabled={isPending}
-                  className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(109,138,108,0.2)]"
+                  className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(159,232,112,0.2)]"
                 >
                   {isPending ? (
                     <span className="flex items-center justify-center gap-2">
@@ -183,7 +183,7 @@ function ResetPasswordForm() {
             transition={{ duration: 0.3 }}
             className="flex flex-col items-center text-center"
           >
-            <CheckCircle2 className="h-16 w-16 text-accent mb-4 drop-shadow-[0_0_10px_rgba(109,138,108,0.4)]" />
+            <CheckCircle2 className="h-16 w-16 text-accent mb-4 drop-shadow-[0_0_10px_rgba(159,232,112,0.4)]" />
             <h1 className="text-2xl font-bold text-white mb-2 font-display">
               Senha Redefinida!
             </h1>
@@ -194,7 +194,7 @@ function ResetPasswordForm() {
             <Button
               type="button"
               onClick={() => router.push('/')}
-              className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(109,138,108,0.2)]"
+              className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(159,232,112,0.2)]"
             >
               Ir para o Login
             </Button>
@@ -234,13 +234,13 @@ export default function ResetPasswordPage() {
             <img
               src="/logo.svg"
               alt="No Front Scale Logo"
-              className="h-14 w-auto object-contain brightness-100 drop-shadow-[0_0_15px_rgba(109,138,108,0.4)]"
+              className="h-14 w-auto object-contain brightness-100 drop-shadow-[0_0_15px_rgba(159,232,112,0.4)]"
             />
           </div>
         </div>
 
         {/* Caixa do Formulário (Glassmorphism) */}
-        <div className="w-full bg-glass-1 backdrop-blur-md border border-border-subtle border-l-[rgba(109,138,108,0.3)] rounded-2xl p-8 shadow-2xl overflow-hidden">
+        <div className="w-full bg-glass-1 backdrop-blur-md border border-border-subtle border-l-[rgba(159,232,112,0.3)] rounded-2xl p-8 shadow-2xl overflow-hidden">
           <React.Suspense fallback={
             <div className="flex flex-col items-center justify-center text-text-secondary text-xs gap-3">
               <Loader2 className="h-6 w-6 animate-spin text-accent" />

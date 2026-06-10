@@ -358,7 +358,7 @@ export function AdminPanel({ initialUsers, initialProjects }: AdminPanelProps) {
           {activeTab === 'projects' ? (
             <button
               onClick={handleOpenCreateProject}
-              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all shadow-[0_0_10px_rgba(109,138,108,0.15)] cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all shadow-[0_0_10px_rgba(159,232,112,0.15)] cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               Criar Projeto
@@ -366,7 +366,7 @@ export function AdminPanel({ initialUsers, initialProjects }: AdminPanelProps) {
           ) : (
             <button
               onClick={handleOpenCreateUser}
-              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all shadow-[0_0_10px_rgba(109,138,108,0.15)] cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all shadow-[0_0_10px_rgba(159,232,112,0.15)] cursor-pointer"
             >
               <UserPlus className="h-4 w-4" />
               Cadastrar Usuário

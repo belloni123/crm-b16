@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --bg-base: #050505;
-  --bg-gradient-end: #09120b; /* Preto para Verde Escuro */
-  --bg-elevated: #0f1811;
-  --bg-card: rgba(255, 255, 255, 0.02);
-  --bg-glass: rgba(255, 255, 255, 0.01);
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  --border-strong: rgba(255, 255, 255, 0.1);
-  --border-glass: rgba(109, 138, 108, 0.15); /* Verde musgo sutil */
-  --text-primary: #EAEAEA;
-  --text-secondary: #888888;
-  --text-tertiary: rgba(234, 234, 234, 0.3);
-  --accent: #6D8A6C; /* Verde Musgo */
-  --accent-light: #8BA88A;
-  --accent-glow: rgba(109, 138, 108, 0.12);
+  --bg-base: #091302;
+  --bg-gradient-end: #0f2205; /* Deep Fir gradient base */
+  --bg-elevated: #163300;
+  --bg-card: rgba(159, 232, 112, 0.02);
+  --bg-glass: rgba(159, 232, 112, 0.01);
+  --border-subtle: rgba(159, 232, 112, 0.05);
+  --border-strong: rgba(159, 232, 112, 0.12);
+  --border-glass: rgba(159, 232, 112, 0.18); /* Sulu translucent border */
+  --text-primary: #f2f9ed;
+  --text-secondary: #889c7d;
+  --text-tertiary: #4e5c46;
+  --accent: #9fe870; /* Sulu Neon Green */
+  --accent-light: #b2f08c;
+  --accent-glow: rgba(159, 232, 112, 0.12);
   --danger: #ef4444;
 
   /* Vidros e Containers Transparentes */
@@ -144,14 +144,14 @@ body::before {
 
 .glass-card:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(109, 138, 108, 0.3);
+  border-color: rgba(159, 232, 112, 0.3);
   border-left-color: var(--accent-light);
   transform: translateY(-2px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
 }
 :root[data-theme='light'] .glass-card:hover {
   background: rgba(255, 255, 255, 1);
-  border-color: rgba(109, 138, 108, 0.4);
+  border-color: rgba(159, 232, 112, 0.4);
   border-left-color: var(--accent-light);
   box-shadow: 0 8px 30px rgba(31, 41, 55, 0.08);
 }
@@ -173,7 +173,7 @@ body::before {
 .glass-input:focus {
   border-color: var(--accent);
   background: rgba(255, 255, 255, 0.03);
-  box-shadow: 0 0 10px rgba(109, 138, 108, 0.2);
+  box-shadow: 0 0 10px rgba(159, 232, 112, 0.2);
 }
 :root[data-theme='light'] .glass-input:focus {
   background: #ffffff;

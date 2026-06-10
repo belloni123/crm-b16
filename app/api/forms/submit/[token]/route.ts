@@ -134,7 +134,7 @@ function renderHtmlSuccessPage(message: string) {
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.05);
-      border-left: 2px solid #6D8A6C;
+      border-left: 2px solid #9FE870;
       box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       border-radius: 12px;
       padding: 32px;
@@ -154,8 +154,8 @@ function renderHtmlSuccessPage(message: string) {
       margin-bottom: 24px;
     }
     .btn {
-      background-color: #6D8A6C;
-      color: white;
+      background-color: #9FE870;
+      color: #163300;
       text-decoration: none;
       font-size: 13px;
       font-weight: bold;
@@ -165,13 +165,13 @@ function renderHtmlSuccessPage(message: string) {
       transition: background-color 0.2s;
     }
     .btn:hover {
-      background-color: #8BA88A;
+      background-color: #b2f08c;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <div style="font-size: 40px; color: #6D8A6C; margin-bottom: 16px;">✓</div>
+    <div style="font-size: 40px; color: #9FE870; margin-bottom: 16px;">✓</div>
     <h1>Formulário Enviado!</h1>
     <p>${message}</p>
     <a href="javascript:history.back()" class="btn">Voltar</a>

@@ -111,7 +111,7 @@ export function LoginForm() {
           <img
             src="/logo.svg"
             alt="No Front Scale Logo"
-            className="h-14 w-auto object-contain brightness-100 drop-shadow-[0_0_15px_rgba(109,138,108,0.4)]"
+            className="h-14 w-auto object-contain brightness-100 drop-shadow-[0_0_15px_rgba(159,232,112,0.4)]"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
@@ -124,7 +124,7 @@ export function LoginForm() {
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
-        className="w-full bg-glass-1 backdrop-blur-md border border-border-subtle border-l-[rgba(109,138,108,0.3)] rounded-2xl p-8 shadow-2xl overflow-hidden"
+        className="w-full bg-glass-1 backdrop-blur-md border border-border-subtle border-l-[rgba(159,232,112,0.3)] rounded-2xl p-8 shadow-2xl overflow-hidden"
       >
         <AnimatePresence mode="wait">
           {mode === 'login' && (
@@ -220,7 +220,7 @@ export function LoginForm() {
                 <Button
                   type="submit"
                   disabled={isPending}
-                  className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(109,138,108,0.2)]"
+                  className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(159,232,112,0.2)]"
                 >
                   {isPending ? (
                     <span className="flex items-center justify-center gap-2">
@@ -288,7 +288,7 @@ export function LoginForm() {
                   <Button
                     type="submit"
                     disabled={isPending}
-                    className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(109,138,108,0.2)]"
+                    className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(159,232,112,0.2)]"
                   >
                     {isPending ? (
                       <span className="flex items-center justify-center gap-2">
@@ -325,7 +325,7 @@ export function LoginForm() {
               transition={{ duration: 0.3 }}
               className="flex flex-col items-center text-center"
             >
-              <CheckCircle2 className="h-16 w-16 text-accent mb-4 drop-shadow-[0_0_10px_rgba(109,138,108,0.4)]" />
+              <CheckCircle2 className="h-16 w-16 text-accent mb-4 drop-shadow-[0_0_10px_rgba(159,232,112,0.4)]" />
               <h1 className="text-2xl font-bold text-white mb-2 font-display">
                 Instruções Enviadas!
               </h1>
@@ -359,7 +359,7 @@ export function LoginForm() {
                   setDebugLink(null);
                   setMode('login');
                 }}
-                className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(109,138,108,0.2)]"
+                className="w-full h-11 bg-accent hover:bg-accent-light text-black font-bold rounded-lg cursor-pointer transition-all duration-200 border-none shadow-[0_0_15px_rgba(159,232,112,0.2)]"
               >
                 Voltar ao Login
               </Button>

@@ -70,7 +70,7 @@ model Stage {
   id              String          @id @default(uuid())
   name            String
   order           Int             @default(0)
-  color           String          @default("#6D8A6C")
+  color           String          @default("#9FE870")
   pipelineId      String
   pipeline        Pipeline        @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   pipelineEntries PipelineEntry[]
@@ -167,7 +167,7 @@ model CustomFieldValue {
 model Tag {
   id        String   @id @default(uuid())
   name      String
-  color     String   @default("#6D8A6C")
+  color     String   @default("#9FE870")
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   leads     Lead[]   @relation("LeadToTag")
