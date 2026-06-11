@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { requireSuperadmin } from '@/lib/security';
 import bcrypt from 'bcryptjs';
 import { revalidatePath } from 'next/cache';
+import { sendProjectInvitationEmail } from '@/lib/mail';
 
 // Listar todos os usuários (Apenas Superadmin)
 export async function getUsers() {
@@ -113,6 +114,27 @@ export async function addProjectMembership(data: { userId: string; projectId: st
       role: data.role
     }
   });
+
+  // Dispara o e-mail de convite para o usuário
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: data.userId },
+      select: { email: true, name: true }
+    });
+
+    const project = await prisma.project.findUnique({
+      where: { id: data.projectId },
+      select: { name: true }
+    });
+
+    if (user && project) {
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      const projectUrl = `${baseUrl}/project/${data.projectId}`;
+      await sendProjectInvitationEmail(user.email, user.name, project.name, projectUrl);
+    }
+  } catch (err) {
+    console.error('Falha ao enviar e-mail de convite de projeto:', err);
+  }
 
   revalidatePath('/admin');
   revalidatePath(`/project/${data.projectId}`);

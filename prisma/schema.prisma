@@ -17,6 +17,8 @@ model User {
   updatedAt         DateTime     @updatedAt
   resetToken        String?      @unique
   resetTokenExpires DateTime?
+  lgpdAccepted      Boolean      @default(false)
+  lgpdAcceptedAt    DateTime?
   memberships       Membership[]
   activities        Activity[]
   assignedLeads     Lead[]       @relation("LeadAssignment")

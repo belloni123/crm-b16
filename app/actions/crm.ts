@@ -14,6 +14,7 @@ function revalidatePath(path: string) {
 import crypto from 'crypto';
 import { getPhoneVariants } from '@/lib/utils';
 import bcrypt from 'bcryptjs';
+import { sendPasswordResetEmail } from '@/lib/mail';
 
 // ==========================================
 // FUNIS E ESTÁGIOS
@@ -1880,13 +1881,15 @@ export async function requestPasswordReset(email: string) {
     }
   });
 
-  // URL de redefinição para simulação local
-  const resetUrl = `http://localhost:3000/reset-password?token=${token}`;
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+  const mailResult = await sendPasswordResetEmail(user.email, resetUrl);
 
   return {
     success: true,
     message: 'Instruções de redefinição enviadas para o e-mail cadastrado.',
-    debugLink: resetUrl
+    debugLink: mailResult.simulated ? resetUrl : null
   };
 }
 
