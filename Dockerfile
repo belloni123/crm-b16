@@ -27,5 +27,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV NODE_ENV=production
 
-# Comando para iniciar
-CMD ["npm", "run", "start"]
+# Comando para iniciar (sincroniza o banco de dados antes de subir o servidor)
+CMD ["sh", "-c", "npx prisma db push && npm run start"]
