@@ -1,6 +1,6 @@
 # Manual do Usuário — Operações de Kanbans, Webhooks e Leads
 
-Este manual fornece instruções passo a passo com exemplos práticos sobre como utilizar os novos recursos de múltiplos Kanbans, roteamento de webhooks, importação CSV e distribuição round-robin na plataforma No Front Scale.
+Este manual fornece instruções passo a passo com exemplos práticos sobre como utilizar os novos recursos de múltiplos Kanbans, roteamento de webhooks, importação CSV e distribuição round-robin na plataforma CRM b16.
 
 ---
 
@@ -101,7 +101,7 @@ Utilize este procedimento para capturar leads através de um formulário gerado 
 
 ## 📈 6. Rastreamento Automático de Campanhas (UTMs)
 
-Quando você utiliza tráfego pago (Google Ads, Facebook Ads) ou campanhas estruturadas, os links que trazem os visitantes ao seu site costumam ter tags como `utm_source=facebook` ou `utm_campaign=promocao`. O CRM No Front Scale captura estes dados automaticamente e armazena de forma isolada nos leads.
+Quando você utiliza tráfego pago (Google Ads, Facebook Ads) ou campanhas estruturadas, os links que trazem os visitantes ao seu site costumam ter tags como `utm_source=facebook` ou `utm_campaign=promocao`. O CRM CRM b16 captura estes dados automaticamente e armazena de forma isolada nos leads.
 
 ### Como Funciona:
 1. **Configuração nos Anúncios:** Você não precisa fazer nenhuma configuração adicional no CRM ou no formulário embutido. Basta montar o link do seu anúncio ou postagem incluindo os parâmetros UTM normais (ex: `https://seusite.com/?utm_source=instagram&utm_medium=stories&utm_campaign=imersao-ago`).
@@ -123,7 +123,7 @@ Se você ou um membro da equipe esquecer a senha de acesso, a plataforma possui 
 
 ### Passo a Passo:
 1. Na página inicial de login do CRM, clique no link **Esqueci minha senha** localizado logo acima do campo de Senha.
-2. Digite o seu e-mail cadastrado no sistema (ex: `admin@nofrontscale.com.br`) e clique em **Recuperar Senha**.
+2. Digite o seu e-mail cadastrado no sistema (ex: `admin@crmb16.com.br`) e clique em **Recuperar Senha**.
 3. Uma tela de confirmação será exibida informando que as instruções foram enviadas.
 4. **Simulação no Ambiente de Desenvolvimento (Sem SMTP local):**
    * Como o ambiente local não possui um servidor de e-mail ativo para disparos reais, um painel especial de depuração (Alerta de Teste) aparecerá na tela de sucesso.

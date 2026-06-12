@@ -298,7 +298,7 @@ export function HelpContent({ projectId, projectRole, markdown }: HelpContentPro
         },
         {
           text: 'Digite seu endereço de e-mail cadastrado e clique em "Recuperar Senha".',
-          example: 'admin@nofrontscale.com.br'
+          example: 'admin@crmb16.com.br'
         },
         {
           text: 'Na tela de sucesso, se estiver em ambiente local de testes, localize o bloco laranja de simulação e clique em "Redefinir Senha de Teste".',

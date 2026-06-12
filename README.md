@@ -1,6 +1,6 @@
-# No Front Scale — Plataforma de CRM Multiprojeto
+# CRM b16 — Plataforma de CRM Multiprojeto
 
-Esta é a plataforma de CRM Multiprojeto oficial do **No Front Scale**, um clube privado de empresários focados em escala de negócios. A plataforma foi desenvolvida focando em estética premium (dark mode com glassmorphism), isolamento multi-tenant rígido por projeto (`project_id`), webhooks de entrada dinâmicos com mapeamento JSON e caixa de entrada integrada de WhatsApp conectada à Evolution API.
+Esta é a plataforma de CRM Multiprojeto oficial do **CRM b16**, um clube privado de empresários focados em escala de negócios. A plataforma foi desenvolvida focando em estética premium (dark mode com glassmorphism), isolamento multi-tenant rígido por projeto (`project_id`), webhooks de entrada dinâmicos com mapeamento JSON e caixa de entrada integrada de WhatsApp conectada à Evolution API.
 
 ---
 
@@ -9,10 +9,10 @@ Esta é a plataforma de CRM Multiprojeto oficial do **No Front Scale**, um clube
 Após rodar o script de banco de dados, você poderá efetuar login com os seguintes usuários de teste:
 
 *   **Superadmin (Acesso Global):**
-    *   **E-mail:** `admin@nofrontscale.com.br`
+    *   **E-mail:** `admin@crmb16.com.br`
     *   **Senha:** `admin123`
 *   **Membro de Teste (Acesso ao Projeto 1):**
-    *   **E-mail:** `membro@nofrontscale.com.br`
+    *   **E-mail:** `membro@crmb16.com.br`
     *   **Senha:** `membro123`
 
 ---
@@ -304,7 +304,7 @@ Adicionamos aprimoramentos estéticos modernos e um sistema completo de redefini
 ### 1. Animações High-Tech na Tela de Login
 *   **Glow Neon Pulsante**: Um efeito de luz neon difusa e pulsante atrás da logomarca principal.
 *   **Logo Reveal**: Animação de entrada do logotipo principal com escala suave e desfoque progressivo.
-*   **Tracking Letters Transition**: O título `No Front Money` expande suavemente o espaçamento de suas letras ao carregar a página.
+*   **Tracking Letters Transition**: O título `CRM b16` expande suavemente o espaçamento de suas letras ao carregar a página.
 
 ### 2. Recuperação de Senha (Esqueci Minha Senha)
 *   **Transição de Card**: Na tela de login, clicando em "Esqueci minha senha", a caixa de login realiza uma transição suave para o formulário de e-mail de recuperação.

@@ -13,8 +13,8 @@ export async function generateMetadata({ params }: PageProps) {
   const member = await getMemberBySlug(slug);
   if (!member) return {};
   return {
-    title: `${member.nome} — Dashboard No Front Scale`,
-    description: `Acompanhe o planejamento estratégico de ${member.nome} na No Front Scale.`,
+    title: `${member.nome} — Dashboard CRM b16`,
+    description: `Acompanhe o planejamento estratégico de ${member.nome} na CRM b16.`,
   };
 }
 

@@ -13,7 +13,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(
           "inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-medium transition-all duration-300 ease-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer",
           variant === "primary" && 
-            "bg-accent text-bg-base hover:shadow-[0_0_40px_-10px_rgba(171,254,55,0.4)]",
+            "bg-accent text-bg-base hover:shadow-[0_0_40px_-10px_rgba(212,168,67,0.4)]",
           variant === "secondary" && 
             "border border-border-strong bg-bg-card text-text-primary hover:bg-bg-elevated hover:border-text-tertiary",
           variant === "danger" && 

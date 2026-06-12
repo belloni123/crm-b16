@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "No Front Scale — No Front Money",
+  title: "CRM b16 — CRM b16",
   description: "Plataforma avançada de gestão de leads, oportunidades e tarefas.",
 };
 

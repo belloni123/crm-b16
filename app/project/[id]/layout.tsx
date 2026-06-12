@@ -66,11 +66,18 @@ export default async function ProjectLayout({ children, params }: Props) {
         <div className="p-6 border-b border-border-subtle flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <Link href="/project">
-              <img
-                src="/logo.svg"
-                alt="No Front Scale"
-                className="h-8 w-auto object-contain brightness-100"
-              />
+              <div className="relative">
+                <img
+                  src="/logo-white.png"
+                  alt="CRM b16"
+                  className="logo-theme-white h-8 w-auto object-contain brightness-100"
+                />
+                <img
+                  src="/logo-dark.png"
+                  alt="CRM b16"
+                  className="logo-theme-dark h-8 w-auto object-contain brightness-100"
+                />
+              </div>
             </Link>
           </div>
           

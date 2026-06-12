@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: PageProps) {
   if (!member) return {};
   return {
     title: `Planejamento — ${member.nome}`,
-    description: `Planejamento estratégico de ${member.nome} na No Front Scale.`,
+    description: `Planejamento estratégico de ${member.nome} na CRM b16.`,
   };
 }
 

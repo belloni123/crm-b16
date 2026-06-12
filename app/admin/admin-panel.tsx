@@ -358,7 +358,7 @@ export function AdminPanel({ initialUsers, initialProjects }: AdminPanelProps) {
           {activeTab === 'projects' ? (
             <button
               onClick={handleOpenCreateProject}
-              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all shadow-[0_0_10px_rgba(159,232,112,0.15)] cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all shadow-[0_0_10px_rgba(212,168,67,0.15)] cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               Criar Projeto
@@ -366,7 +366,7 @@ export function AdminPanel({ initialUsers, initialProjects }: AdminPanelProps) {
           ) : (
             <button
               onClick={handleOpenCreateUser}
-              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all shadow-[0_0_10px_rgba(159,232,112,0.15)] cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all shadow-[0_0_10px_rgba(212,168,67,0.15)] cursor-pointer"
             >
               <UserPlus className="h-4 w-4" />
               Cadastrar Usuário
@@ -583,7 +583,7 @@ export function AdminPanel({ initialUsers, initialProjects }: AdminPanelProps) {
                 <input
                   required
                   type="text"
-                  placeholder="Ex: No Front Scale Club"
+                  placeholder="Ex: CRM b16 Club"
                   value={projName}
                   onChange={(e) => setProjName(e.target.value)}
                   className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-accent"
@@ -650,7 +650,7 @@ export function AdminPanel({ initialUsers, initialProjects }: AdminPanelProps) {
                 <input
                   required
                   type="email"
-                  placeholder="joao@nofrontscale.com.br"
+                  placeholder="joao@crmb16.com.br"
                   value={userEmail}
                   onChange={(e) => setUserEmail(e.target.value)}
                   className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-accent"

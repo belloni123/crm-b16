@@ -7,9 +7,9 @@ atualizado: "2026-05-27"
 
 ## 1. Transição de Herdeiro para Líder Dono
 
-O principal objetivo existencial e empresarial de Luian Menezes no No Front Scale é consolidar sua transição de herdeiro (terceira geração da Óticas Tesouro) para dono de fato da operação. A Óticas Tesouro é um negócio sólido com 8 lojas e faturamento anual próximo a R$ 15 milhões, porém a governança familiar exige um amadurecimento estratégico expressivo para manter o crescimento sustentável.
+O principal objetivo existencial e empresarial de Luian Menezes no CRM b16 é consolidar sua transição de herdeiro (terceira geração da Óticas Tesouro) para dono de fato da operação. A Óticas Tesouro é um negócio sólido com 8 lojas e faturamento anual próximo a R$ 15 milhões, porém a governança familiar exige um amadurecimento estratégico expressivo para manter o crescimento sustentável.
 
-Esta transição exige o fortalecimento do posicionamento pessoal dentro do quadro de sócios e colaboradores da empresa, deixando de ser visto apenas como o "filho do dono" encarregado do financeiro para ser reconhecido como uma liderança ativa, estratégica e visionária. O ambiente de pressão positiva do No Front Scale funcionará como catalisador desse comportamento, fornecendo referências de empresários maduros e desafiando Luian a assumir o protagonismo das decisões de expansão da rede.
+Esta transição exige o fortalecimento do posicionamento pessoal dentro do quadro de sócios e colaboradores da empresa, deixando de ser visto apenas como o "filho do dono" encarregado do financeiro para ser reconhecido como uma liderança ativa, estratégica e visionária. O ambiente de pressão positiva do CRM b16 funcionará como catalisador desse comportamento, fornecendo referências de empresários maduros e desafiando Luian a assumir o protagonismo das decisões de expansão da rede.
 
 ## 2. Eficiência Comercial e Operação de Lojas
 

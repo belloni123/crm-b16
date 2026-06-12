@@ -12,9 +12,9 @@
   --text-primary: #f5f5f5; /* Pure neutral off-white */
   --text-secondary: #a3a3a3; /* Neutral cool gray */
   --text-tertiary: #525252; /* Neutral dark gray */
-  --accent: #9fe870; /* Sulu Neon Green (kept only for highlights/buttons) */
-  --accent-light: #b2f08c;
-  --accent-glow: rgba(159, 232, 112, 0.12);
+  --accent: #d4a843; /* Gold / Amarelo Ouro */
+  --accent-light: #e6c273;
+  --accent-glow: rgba(212, 168, 67, 0.12);
   --danger: #ef4444;
 
   /* Vidros e Containers Transparentes */
@@ -144,14 +144,14 @@ body::before {
 
 .glass-card:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(159, 232, 112, 0.3);
+  border-color: rgba(212, 168, 67, 0.3);
   border-left-color: var(--accent-light);
   transform: translateY(-2px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
 }
 :root[data-theme='light'] .glass-card:hover {
   background: rgba(255, 255, 255, 1);
-  border-color: rgba(159, 232, 112, 0.4);
+  border-color: rgba(212, 168, 67, 0.4);
   border-left-color: var(--accent-light);
   box-shadow: 0 8px 30px rgba(31, 41, 55, 0.08);
 }
@@ -173,11 +173,11 @@ body::before {
 .glass-input:focus {
   border-color: var(--accent);
   background: rgba(255, 255, 255, 0.03);
-  box-shadow: 0 0 10px rgba(159, 232, 112, 0.2);
+  box-shadow: 0 0 10px rgba(212, 168, 67, 0.2);
 }
 :root[data-theme='light'] .glass-input:focus {
   background: #ffffff;
-  box-shadow: 0 0 10px rgba(74, 102, 73, 0.15);
+  box-shadow: 0 0 10px rgba(212, 168, 67, 0.15);
 }
 
 /* Custom Scrollbar */
@@ -283,6 +283,25 @@ body::before {
 :root[data-theme='light'] .group:hover .group-hover\:text-white {
   color: var(--text-primary) !important;
 }
+:root[data-theme='light'] .group:hover .group-hover\:text-white {
+  color: var(--text-primary) !important;
+}
+
+/* Custom CSS class to show/hide logo based on theme */
+.logo-theme-white {
+  display: block;
+}
+.logo-theme-dark {
+  display: none;
+}
+
+:root[data-theme='light'] .logo-theme-white {
+  display: none;
+}
+:root[data-theme='light'] .logo-theme-dark {
+  display: block;
+}
+
 
 /* Adjust scrollbar visibility in Light Mode */
 :root[data-theme='light'] ::-webkit-scrollbar-thumb {

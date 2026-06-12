@@ -526,11 +526,11 @@ ${fieldsHtml}
 
   // Form de Estágio
   const [newStageName, setNewStageName] = useState('');
-  const [newStageColor, setNewStageColor] = useState('#9FE870');
+  const [newStageColor, setNewStageColor] = useState('#d4a843');
 
   // Form de Tag
   const [newTagName, setNewTagName] = useState('');
-  const [newTagColor, setNewTagColor] = useState('#9FE870');
+  const [newTagColor, setNewTagColor] = useState('#d4a843');
 
   // Form de Origem
   const [newOriginName, setNewOriginName] = useState('');

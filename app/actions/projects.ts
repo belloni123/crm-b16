@@ -122,7 +122,7 @@ export async function createProject(data: { name: string; description?: string }
   // Cria tags padrões
   await prisma.tag.createMany({
     data: [
-      { name: 'Decisor', color: '#9fe870', projectId: project.id },
+      { name: 'Decisor', color: '#d4a843', projectId: project.id },
       { name: 'ICP Ideal', color: '#abfe37', projectId: project.id },
       { name: 'High Ticket', color: '#8b5cf6', projectId: project.id },
     ],

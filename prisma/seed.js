@@ -33,7 +33,7 @@ async function main() {
   const superadmin = await prisma.user.create({
     data: {
       name: 'Felipe Belloni',
-      email: 'admin@nofrontscale.com.br',
+      email: 'admin@crmb16.com.br',
       passwordHash,
       role: 'SUPERADMIN',
     },
@@ -53,7 +53,7 @@ async function main() {
   const memberUser = await prisma.user.create({
     data: {
       name: 'Consultor NFS',
-      email: 'membro@nofrontscale.com.br',
+      email: 'membro@crmb16.com.br',
       passwordHash: memberPasswordHash,
       role: 'USER',
     },

@@ -41,11 +41,18 @@ export default async function ProjectDispatcherPage() {
   return (
     <main className="flex-1 flex flex-col items-center justify-center p-6 bg-bg-base min-h-screen text-center">
       <div className="w-full max-w-[480px] bg-glass-1 backdrop-blur-md border border-border-subtle rounded-2xl p-8 shadow-2xl">
-        <img
-          src="/logo.svg"
-          alt="No Front Scale Logo"
-          className="h-10 mx-auto mb-6"
-        />
+        <div className="relative mb-6">
+          <img
+            src="/logo-white.png"
+            alt="CRM b16 Logo"
+            className="logo-theme-white h-10 mx-auto"
+          />
+          <img
+            src="/logo-dark.png"
+            alt="CRM b16 Logo"
+            className="logo-theme-dark h-10 mx-auto"
+          />
+        </div>
         <h1 className="text-xl font-bold font-display text-white mb-3">
           Nenhum Projeto Vinculado
         </h1>
