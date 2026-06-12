@@ -28,4 +28,4 @@ ENV PORT=3000
 ENV NODE_ENV=production
 
 # Comando para iniciar (sincroniza o banco de dados antes de subir o servidor)
-CMD ["sh", "-c", "npx prisma db push && npm run start"]
+CMD ["sh", "-c", "npx prisma db push && node prisma/seed.js && npm run start"]

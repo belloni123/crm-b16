@@ -83,6 +83,8 @@ export async function createWhatsAppInstance(projectId: string, name: string, ty
   // 2. Tenta registrar a instância na Evolution API
   if (EVOLUTION_API_URL && EVOLUTION_API_KEY && type === 'WHATSAPP') {
     try {
+      const baseUrl = process.env.NEXTAUTH_URL || 'https://crm.agenciab16.com.br';
+      
       const response = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
         method: 'POST',
         headers: {
@@ -95,6 +97,13 @@ export async function createWhatsAppInstance(projectId: string, name: string, ty
           qrcode: true,
           sendPresence: true,
           integration: 'WHATSAPP-BAILEYS',
+          webhook_baileys: {
+            url: `${baseUrl}/api/webhooks/whatsapp`,
+            events: [
+              "MESSAGES_UPSERT",
+              "MESSAGES_UPDATE"
+            ]
+          }
         }),
       });
 

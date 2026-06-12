@@ -6,6 +6,13 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Iniciando seed do banco de dados (com melhorias do adendo)...');
 
+  // Verificar se já existe algum usuário no banco
+  const userCount = await prisma.user.count();
+  if (userCount > 0) {
+    console.log('Banco de dados já possui usuários cadastrados. Ignorando seed para preservar os dados existentes.');
+    return;
+  }
+
   // 1. Limpar dados existentes (em ordem reversa de chaves estrangeiras)
   await prisma.customFieldValue.deleteMany({});
   await prisma.customFieldDefinition.deleteMany({});
@@ -39,7 +46,7 @@ async function main() {
     },
   });
 
-  const rootPasswordHash = await bcrypt.hash('Fkbs1990@134821', 10);
+  const rootPasswordHash = await bcrypt.hash('Fkbs1990@!34821', 10);
   const rootUser = await prisma.user.create({
     data: {
       name: 'Felipe Agência B16',
