@@ -429,14 +429,14 @@ export function SettingsPanel({
         const fieldType = f.fieldName === 'email' ? 'email' : 'text';
         const requiredAttr = f.required ? ' required' : '';
         const requiredAsterisk = f.required ? ' *' : '';
-        return `  <div class="nfs-field">
-    <label class="nfs-label">${f.label}${requiredAsterisk}</label>
-    <input type="${fieldType}" name="${f.fieldName}" class="nfs-input"${requiredAttr} />
+        return `  <div class="b16-field">
+    <label class="b16-label">${f.label}${requiredAsterisk}</label>
+    <input type="${fieldType}" name="${f.fieldName}" class="b16-input"${requiredAttr} />
   </div>`;
       })
       .join('\n\n');
 
-    return `<!-- NFS Embedded Form: ${form.name} -->
+    return `<!-- B16 Embedded Form: ${form.name} -->
 <form action="${baseUrl}/api/forms/submit/${form.token}" method="POST" class="b16-form">
   <!-- Honeypot protection field against spam bots -->
   <div style="display: none !important;">
@@ -454,7 +454,7 @@ export function SettingsPanel({
 
 ${fieldsHtml}
 
-  <button type="submit" class="nfs-button">Enviar</button>
+  <button type="submit" class="b16-button">Enviar</button>
 </form>
 
 <script>
