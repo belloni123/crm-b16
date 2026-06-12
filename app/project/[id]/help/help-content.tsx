@@ -247,8 +247,8 @@ export function HelpContent({ projectId, projectRole, markdown }: HelpContentPro
         }
       ],
       notes: [
-        'O formulário gerado é limpo e sem estilo inline. Use as classes CSS .nfs-form, .nfs-field, .nfs-label, .nfs-input e .nfs-button para aplicar seu próprio design.',
-        'A proteção honeypot (campo nfs_hp_website) descarta envios de robôs de spam de forma totalmente silenciosa.'
+        'O formulário gerado é limpo e sem estilo inline. Use as classes CSS .b16-form, .b16-field, .b16-label, .b16-input e .b16-button para aplicar seu próprio design.',
+        'A proteção honeypot (campo b16_hp_website) descarta envios de robôs de spam de forma totalmente silenciosa.'
       ]
     },
     {

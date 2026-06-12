@@ -95,7 +95,7 @@ Utilize este procedimento para capturar leads através de um formulário gerado 
 6. Na listagem de formulários, localize a opção criada e clique em **Embutir Code**.
 7. Clique no botão **Copiar Código** no modal de visualização.
 8. No editor do seu site WordPress (Gutenberg, Elementor, etc.), adicione um bloco de **HTML Personalizado** e cole o código copiado.
-9. Você pode customizar os estilos visuais livremente em seu CSS utilizando as classes `.nfs-form`, `.nfs-field`, `.nfs-label`, `.nfs-input` e `.nfs-button`.
+9. Você pode customizar os estilos visuais livremente em seu CSS utilizando as classes `.b16-form`, `.b16-field`, `.b16-label`, `.b16-input` e `.b16-button`.
 
 ---
 

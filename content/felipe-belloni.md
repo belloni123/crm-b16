@@ -34,4 +34,4 @@ Portanto, o planejamento de 2026 estabelece os seguintes pilares de sustentabili
 * **Blindagem de Agenda Familiar**: Estabelecer horários de encerramento da jornada de trabalho (por exemplo, desligamento de telas após as 18:30) para garantir total presença no suporte familiar e acompanhamento das crianças.
 * **Liberdade e Ausência de Amarras**: Organizar a rotina de forma flexível para acomodar o funcionamento cerebral diferenciado e a alta capacidade criativa, evitando reuniões desnecessárias e rotinas sociais burocráticas que provoquem desgaste cognitivo.
 
-O sucesso da estratégia NFS será medido pelo equilíbrio entre o atingimento da meta financeira e a manutenção de uma vida pessoal rica, saudável e presente.
+O sucesso da estratégia CRM B16 será medido pelo equilíbrio entre o atingimento da meta financeira e a manutenção de uma vida pessoal rica, saudável e presente.

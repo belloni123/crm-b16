@@ -437,10 +437,10 @@ export function SettingsPanel({
       .join('\n\n');
 
     return `<!-- NFS Embedded Form: ${form.name} -->
-<form action="${baseUrl}/api/forms/submit/${form.token}" method="POST" class="nfs-form">
+<form action="${baseUrl}/api/forms/submit/${form.token}" method="POST" class="b16-form">
   <!-- Honeypot protection field against spam bots -->
   <div style="display: none !important;">
-    <input type="text" name="nfs_hp_website" tabindex="-1" autocomplete="off" />
+    <input type="text" name="b16_hp_website" tabindex="-1" autocomplete="off" />
   </div>
 
   <!-- Hidden tracking fields for campaigns (UTMs) -->
@@ -466,26 +466,26 @@ ${fieldsHtml}
     utms.forEach(function(key) {
       var val = params.get(key);
       if (val) {
-        localStorage.setItem('nfs_' + key, val);
+        localStorage.setItem('b16_' + key, val);
       }
     });
 
     // Registrar o referrer (página anterior) e url de entrada se não existirem no localStorage
-    if (document.referrer && !localStorage.getItem('nfs_referrer')) {
-      localStorage.setItem('nfs_referrer', document.referrer);
+    if (document.referrer && !localStorage.getItem('b16_referrer')) {
+      localStorage.setItem('b16_referrer', document.referrer);
     }
-    if (!localStorage.getItem('nfs_url')) {
-      localStorage.setItem('nfs_url', window.location.href);
+    if (!localStorage.getItem('b16_url')) {
+      localStorage.setItem('b16_url', window.location.href);
     }
 
     // Valores finais preenchidos (busca da URL, cai para o localStorage da primeira visita, ou fica vazio)
     var values = {
-      utm_source: params.get('utm_source') || localStorage.getItem('nfs_utm_source') || '',
-      utm_medium: params.get('utm_medium') || localStorage.getItem('nfs_utm_medium') || '',
-      utm_campaign: params.get('utm_campaign') || localStorage.getItem('nfs_utm_campaign') || '',
-      utm_content: params.get('utm_content') || localStorage.getItem('nfs_utm_content') || '',
-      utm_term: params.get('utm_term') || localStorage.getItem('nfs_utm_term') || '',
-      referrer: document.referrer || localStorage.getItem('nfs_referrer') || '',
+      utm_source: params.get('utm_source') || localStorage.getItem('b16_utm_source') || '',
+      utm_medium: params.get('utm_medium') || localStorage.getItem('b16_utm_medium') || '',
+      utm_campaign: params.get('utm_campaign') || localStorage.getItem('b16_utm_campaign') || '',
+      utm_content: params.get('utm_content') || localStorage.getItem('b16_utm_content') || '',
+      utm_term: params.get('utm_term') || localStorage.getItem('b16_utm_term') || '',
+      referrer: document.referrer || localStorage.getItem('b16_referrer') || '',
       url: window.location.href
     };
 
@@ -1779,7 +1779,7 @@ ${fieldsHtml}
                   Regras importantes de segurança e uso da API:
                 </p>
                 <ul className="list-disc pl-4 space-y-1">
-                  <li>O token de API inteiro <code className="text-white">nfs_...</code> <strong>só será exibido uma vez</strong> no momento da geração para você copiar. Guarde-o em local seguro!</li>
+                  <li>O token de API inteiro <code className="text-white">b16_...</code> <strong>só será exibido uma vez</strong> no momento da geração para você copiar. Guarde-o em local seguro!</li>
                   <li>No banco de dados, guardamos apenas o hash da chave de API por motivos de segurança (a chave original nunca é exposta nem legível).</li>
                   <li><strong>Rate Limiting</strong>: Há um limite de até <strong>60 requisições por minuto</strong> por chave de API.</li>
                 </ul>
@@ -2317,11 +2317,11 @@ ${fieldsHtml}
                   Você tem total liberdade para estilizar o formulário no CSS do seu site WordPress. O formulário é gerado com as seguintes classes semânticas:
                 </p>
                 <ul className="list-disc pl-4 space-y-1 text-text-secondary text-[11px] font-mono">
-                  <li><strong className="text-white">.nfs-form</strong>: Aplica-se à tag &lt;form&gt; principal.</li>
-                  <li><strong className="text-white">.nfs-field</strong>: Div contendo um campo (rótulo + input).</li>
-                  <li><strong className="text-white">.nfs-label</strong>: A tag &lt;label&gt; do campo.</li>
-                  <li><strong className="text-white">.nfs-input</strong>: Os campos de entrada (&lt;input type="text"&gt; ou &lt;input type="email"&gt;).</li>
-                  <li><strong className="text-white">.nfs-button</strong>: O botão &lt;button type="submit"&gt; de envio.</li>
+                  <li><strong className="text-white">.b16-form</strong>: Aplica-se à tag &lt;form&gt; principal.</li>
+                  <li><strong className="text-white">.b16-field</strong>: Div contendo um campo (rótulo + input).</li>
+                  <li><strong className="text-white">.b16-label</strong>: A tag &lt;label&gt; do campo.</li>
+                  <li><strong className="text-white">.b16-input</strong>: Os campos de entrada (&lt;input type="text"&gt; ou &lt;input type="email"&gt;).</li>
+                  <li><strong className="text-white">.b16-button</strong>: O botão &lt;button type="submit"&gt; de envio.</li>
                 </ul>
               </div>
             </div>

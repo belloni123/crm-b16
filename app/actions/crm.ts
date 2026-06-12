@@ -1650,7 +1650,7 @@ export async function generateProjectApiKey(projectId: string) {
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
 
   // Gera token aleatório: nfs_ + 32 bytes hex (68 caracteres)
-  const token = 'nfs_' + crypto.randomBytes(32).toString('hex');
+  const token = 'b16_' + crypto.randomBytes(32).toString('hex');
   const prefix = token.substring(0, 12); // ex: nfs_ + 8 caracteres hex
 
   // Hash bcrypt da chave completa
@@ -1724,7 +1724,7 @@ export async function createForm(
     throw new Error('O formulário deve conter pelo menos um campo identificador (E-mail ou Telefone) para fins de deduplicação.');
   }
 
-  const token = 'nfs_form_' + crypto.randomBytes(24).toString('hex');
+  const token = 'b16_form_' + crypto.randomBytes(24).toString('hex');
 
   const form = await prisma.form.create({
     data: {

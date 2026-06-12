@@ -65,7 +65,7 @@ export async function createWhatsAppInstance(projectId: string, name: string, ty
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
 
   // Gera um nome único e token para a instância na Evolution API
-  const instanceName = `nfs_${projectId.substring(0, 8)}_${crypto.randomBytes(4).toString('hex')}`;
+  const instanceName = `b16_${projectId.substring(0, 8)}_${crypto.randomBytes(4).toString('hex')}`;
   const token = crypto.randomBytes(16).toString('hex');
 
   // 1. Cria a instância no banco de dados local

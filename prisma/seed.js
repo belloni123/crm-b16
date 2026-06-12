@@ -52,7 +52,7 @@ async function main() {
   const memberPasswordHash = await bcrypt.hash('membro123', 10);
   const memberUser = await prisma.user.create({
     data: {
-      name: 'Consultor NFS',
+      name: 'Consultor CRM B16',
       email: 'membro@crmb16.com.br',
       passwordHash: memberPasswordHash,
       role: 'USER',

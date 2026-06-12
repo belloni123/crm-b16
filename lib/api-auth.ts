@@ -33,10 +33,10 @@ export async function authenticateApiKey(request: Request): Promise<AuthResult> 
     };
   }
 
-  if (token.length < 12 || !token.startsWith('nfs_')) {
+  if (token.length < 12 || !token.startsWith('b16_')) {
     return {
       authenticated: false,
-      error: 'Formato de chave de API inválido. Deve começar com "nfs_".',
+      error: 'Formato de chave de API inválido. Deve começar com "b16_".',
       status: 401
     };
   }

@@ -126,7 +126,7 @@ async function runTests() {
       name: 'Cliente Form Teste',
       email: 'clienteform@teste.com',
       phone: '11988887777',
-      nfs_hp_website: '' // honeypot vazio (humano)
+      b16_hp_website: '' // honeypot vazio (humano)
     };
 
     const request = new NextRequest(`http://localhost:3000/api/forms/submit/${formToken}`, {
@@ -171,7 +171,7 @@ async function runTests() {
       name: 'Spambot Malicioso',
       email: 'spambot@spam.com',
       phone: '11911112222',
-      nfs_hp_website: 'http://spambot.com' // preenchido (robô!)
+      b16_hp_website: 'http://spambot.com' // preenchido (robô!)
     };
 
     const botRequest = new NextRequest(`http://localhost:3000/api/forms/submit/${formToken}`, {
@@ -219,7 +219,7 @@ async function runTests() {
           name: `Flood ${i}`,
           email: `flood${i}@teste.com`,
           phone: '11900000000',
-          nfs_hp_website: ''
+          b16_hp_website: ''
         })
       });
 
@@ -241,7 +241,7 @@ async function runTests() {
       name: 'Cliente UTM Teste',
       email: 'clienteutm@teste.com',
       phone: '11977776666',
-      nfs_hp_website: '',
+      b16_hp_website: '',
       utm_source: 'google',
       utm_medium: 'cpc',
       utm_campaign: 'blackfriday_2026',
@@ -288,7 +288,7 @@ async function runTests() {
       name: 'Cliente UTM Teste Atualizado',
       email: 'clienteutm@teste.com',
       phone: '11977776666',
-      nfs_hp_website: '',
+      b16_hp_website: '',
       utm_source: 'facebook',
       utm_medium: 'paid',
       utm_campaign: 'natal_2026',

@@ -245,7 +245,7 @@ export async function POST(
 
   // 5. Proteção Contra Spam: Honeypot
   // O robô preencherá o campo oculto. Humanos não o vêem.
-  const honeypotVal = body.nfs_hp_website;
+  const honeypotVal = body.b16_hp_website;
   if (honeypotVal !== undefined && honeypotVal.trim() !== '') {
     // Descarte silencioso: fingimos que deu tudo certo para confundir o spambot!
     if (isJson) {

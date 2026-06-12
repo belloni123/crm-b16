@@ -37,7 +37,7 @@ async function testApi() {
   console.log(`Projeto 2 (Rate Limit): "${project2.name}" (ID: ${project2.id})\n`);
 
   // 2. Gerar chaves de API para os dois projetos
-  const mainToken = 'nfs_test_main_' + crypto.randomBytes(20).toString('hex');
+  const mainToken = 'b16_test_main_' + crypto.randomBytes(20).toString('hex');
   const mainPrefix = mainToken.substring(0, 12);
   const mainHash = bcrypt.hashSync(mainToken, bcrypt.genSaltSync(10));
 
@@ -72,7 +72,7 @@ async function testApi() {
     // --- Teste B: Requisição com Token Inválido ---
     console.log('\n--- Teste B: Requisição com token inválido (Esperado: 401) ---');
     const resBadToken = await fetch(`${BASE_URL}/api/v1/pipelines`, {
-      headers: { 'Authorization': 'Bearer nfs_token_falso_12345' }
+      headers: { 'Authorization': 'Bearer b16_token_falso_12345' }
     });
     console.log(`Status: ${resBadToken.status}`);
     const bodyBadToken = await resBadToken.json();

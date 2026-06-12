@@ -52,7 +52,7 @@ Você pode rodar o PostgreSQL local de duas maneiras: via **Docker** ou nativame
    ```
 3. **Crie o banco de dados oficial:**
    ```bash
-   createdb -O crm_user nfs_crm
+   createdb -O crm_user crm_b16
    ```
 4. **Defina a senha do usuário do banco (deve corresponder ao .env):**
    ```bash
@@ -85,7 +85,7 @@ Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
 
 ```env
 # Banco de Dados (PostgreSQL para Produção no Coolify)
-DATABASE_URL="postgresql://postgres:sua_senha_segura@postgres:5432/nofrontcrm?schema=public"
+DATABASE_URL="postgresql://postgres:sua_senha_segura@postgres:5432/crm_b16?schema=public"
 
 # Configurações do NextAuth
 NEXTAUTH_URL="http://localhost:3000" # Em produção, altere para https://seu-dominio.com
@@ -157,15 +157,15 @@ A plataforma disponibiliza uma API REST integrada no padrão `/api/v1` para faci
 
 ### 🔐 Geração e Segurança de Chaves de API
 1. Acesse as **Configurações do Projeto > Desenvolvedor & API**.
-2. Clique em **Gerar Chave de API** para gerar um token aleatório seguro (ex: `nfs_test_main_...`).
+2. Clique em **Gerar Chave de API** para gerar um token aleatório seguro (ex: `b16_test_main_...`).
 3. > [!WARNING]
    > **Aviso de Exibição Única**: A chave de API inteira é mostrada **apenas uma vez** em um modal de aviso. Você deve copiá-la e salvá-la imediatamente. Após sair da tela, o CRM nunca mais exibirá a chave original.
 4. **Armazenamento de Alta Segurança**: Por motivos de conformidade e segurança, o CRM realiza o hash da sua chave completa usando `bcrypt` antes de persistir no banco de dados (a chave nunca é guardada legível). O banco armazena apenas o hash (`apiKeyHash`) e os primeiros 12 caracteres (`apiKeyPrefix`) como identificador visual e busca indexada.
 
 ### 🛡️ Autenticação e Rate Limiting
 * **Headers Aceitos**:
-  * `Authorization: Bearer nfs_...` (Recomendado)
-  * `x-api-key: nfs_...`
+  * `Authorization: Bearer b16_...` (Recomendado)
+  * `x-api-key: b16_...`
 * **Rate Limiting Protetivo**: Cada chave de API possui um teto de **60 requisições por minuto**.
   * Requisições que excederem o limite receberão a resposta `429 Too Many Requests` com o cabeçalho `Retry-After` informando os segundos restantes para liberação.
 
@@ -240,31 +240,31 @@ A plataforma possui um **Construtor de Formulários** integrado nas Configuraç�
 ### 3. Customização Visual (CSS)
 O código HTML gerado é cru e limpo, sem estilos embutidos pesados ou iframe. Ele utiliza classes semânticas previsíveis para permitir controle total de design via folha de estilo (CSS) externa do seu site:
 
-*   **`.nfs-form`**: Classe atribuída à tag principal `<form>`.
-*   **`.nfs-field`**: Classe da `<div>` que envolve cada par de rótulo e entrada.
-*   **`.nfs-label`**: Classe aplicada à tag `<label>`.
-*   **`.nfs-input`**: Classe aplicada aos campos `<input>` (texto, número, email).
-*   **`.nfs-button`**: Classe aplicada ao botão `<button type="submit">` de envio.
+*   **`.b16-form`**: Classe atribuída à tag principal `<form>`.
+*   **`.b16-field`**: Classe da `<div>` que envolve cada par de rótulo e entrada.
+*   **`.b16-label`**: Classe aplicada à tag `<label>`.
+*   **`.b16-input`**: Classe aplicada aos campos `<input>` (texto, número, email).
+*   **`.b16-button`**: Classe aplicada ao botão `<button type="submit">` de envio.
 
 Exemplo de CSS simples para estilização rápida:
 ```css
-.nfs-form {
+.b16-form {
   max-width: 400px;
   margin: 0 auto;
   padding: 20px;
   background: #111;
   border-radius: 8px;
 }
-.nfs-field {
+.b16-field {
   margin-bottom: 15px;
 }
-.nfs-label {
+.b16-label {
   display: block;
   color: #fff;
   font-size: 14px;
   margin-bottom: 5px;
 }
-.nfs-input {
+.b16-input {
   width: 100%;
   padding: 8px;
   background: #222;
@@ -272,7 +272,7 @@ Exemplo de CSS simples para estilização rápida:
   color: #fff;
   border-radius: 4px;
 }
-.nfs-button {
+.b16-button {
   width: 100%;
   padding: 10px;
   background-color: #6D8A6C;
@@ -282,15 +282,15 @@ Exemplo de CSS simples para estilização rápida:
   border-radius: 4px;
   cursor: pointer;
 }
-.nfs-button:hover {
+.b16-button:hover {
   background-color: #8BA88A;
 }
 ```
 
 ### 4. Proteção Robusta Contra Spam (Honeypot)
-O código gerado inclui um campo invisível para humanos chamado `nfs_hp_website`, escondido por uma regra inline de CSS (`display: none !important;`).
+O código gerado inclui um campo invisível para humanos chamado `b16_hp_website`, escondido por uma regra inline de CSS (`display: none !important;`).
 *   **Como funciona:** Usuários reais não enxergam esse campo, portanto deixam-no em branco. Robôs/Spambots ignoram regras de CSS e vasculham o código HTML preenchendo todos os campos que encontram na tentativa de enviar propagandas.
-*   **Resposta do CRM:** Quando a API recebe um envio onde o campo `nfs_hp_website` está preenchido, o CRM detecta imediatamente que é um bot de spam. O servidor **descarta o envio silenciosamente** (não cria o lead no banco de dados) e devolve uma resposta de sucesso (200 OK ou redirecionamento). Isso engana o bot, fazendo-o pensar que o spam funcionou, evitando que ele tente burlar a segurança por outros meios.
+*   **Resposta do CRM:** Quando a API recebe um envio onde o campo `b16_hp_website` está preenchido, o CRM detecta imediatamente que é um bot de spam. O servidor **descarta o envio silenciosamente** (não cria o lead no banco de dados) e devolve uma resposta de sucesso (200 OK ou redirecionamento). Isso engana o bot, fazendo-o pensar que o spam funcionou, evitando que ele tente burlar a segurança por outros meios.
 
 ### 5. Rate Limiting por IP
 Para evitar ataques de negação de serviço (DoS) ou inundações de envios (flood), o endpoint público de formulários limita as submissões a **no máximo 10 envios por minuto por endereço IP**. Se ultrapassado, as tentativas adicionais serão bloqueadas com o código de resposta HTTP `429 Too Many Requests`.
