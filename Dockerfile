@@ -19,7 +19,7 @@ RUN npx prisma generate
 
 # Executa o build da aplicação Next.js
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build
 
 # Expõe a porta que a aplicação roda
 EXPOSE 3000
