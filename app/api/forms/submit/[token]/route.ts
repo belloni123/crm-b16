@@ -298,6 +298,9 @@ export async function POST(
       }
       if (field.fieldName === 'phone' && val) {
         phone = val.replace(/\D/g, ''); // Remove formatações
+        if (phone && !phone.startsWith('55')) {
+          phone = '55' + phone;
+        }
       }
     } else if (field.type === 'CUSTOM' && field.customFieldDefinitionId && val) {
       customFieldValues.push({

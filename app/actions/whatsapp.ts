@@ -42,14 +42,17 @@ async function ensureWebhookConfigured(instanceName: string) {
           'apikey': EVOLUTION_API_KEY,
         },
         body: JSON.stringify({
-          enabled: true,
-          url: webhookUrl,
-          webhook_by_events: false,
-          events: [
-            "MESSAGES_UPSERT",
-            "MESSAGES_UPDATE",
-            "CONNECTION_UPDATE"
-          ]
+          webhook: {
+            enabled: true,
+            url: webhookUrl,
+            byEvents: false,
+            base64: false,
+            events: [
+              "MESSAGES_UPSERT",
+              "MESSAGES_UPDATE",
+              "CONNECTION_UPDATE"
+            ]
+          }
         }),
       });
       
@@ -364,23 +367,41 @@ export async function sendWhatsAppMessage(
 
       if (messageType === 'TEXT') {
         endpoint = `/message/sendText/${instance.instanceName}`;
-        payload.textMessage = {
-          text: content,
-        };
+        payload.text = content;
       } else {
         endpoint = `/message/sendMedia/${instance.instanceName}`;
         
         let mediatype = 'document';
-        if (messageType === 'IMAGE') mediatype = 'image';
-        else if (messageType === 'AUDIO') mediatype = 'audio';
-        else if (messageType === 'VIDEO') mediatype = 'video';
+        let mimetype = 'application/pdf';
+        if (messageType === 'IMAGE') {
+          mediatype = 'image';
+          mimetype = 'image/png';
+        } else if (messageType === 'AUDIO') {
+          mediatype = 'audio';
+          mimetype = 'audio/mp3';
+        } else if (messageType === 'VIDEO') {
+          mediatype = 'video';
+          mimetype = 'video/mp4';
+        }
 
-        payload.mediaMessage = {
-          mediatype,
-          fileName: content || (messageType === 'IMAGE' ? 'imagem.png' : messageType === 'AUDIO' ? 'audio.mp3' : 'documento.pdf'),
-          caption: messageType === 'IMAGE' ? content : '',
-          media: mediaUrl || '',
-        };
+        if (mediaUrl) {
+          const ext = mediaUrl.split('.').pop()?.split('?')[0].toLowerCase();
+          if (ext === 'png') mimetype = 'image/png';
+          else if (ext === 'jpg' || ext === 'jpeg') mimetype = 'image/jpeg';
+          else if (ext === 'gif') mimetype = 'image/gif';
+          else if (ext === 'webp') mimetype = 'image/webp';
+          else if (ext === 'mp3') mimetype = 'audio/mpeg';
+          else if (ext === 'wav') mimetype = 'audio/wav';
+          else if (ext === 'ogg') mimetype = 'audio/ogg';
+          else if (ext === 'mp4') mimetype = 'video/mp4';
+          else if (ext === 'pdf') mimetype = 'application/pdf';
+        }
+
+        payload.mediatype = mediatype;
+        payload.mimetype = mimetype;
+        payload.caption = messageType === 'IMAGE' ? content : '';
+        payload.media = mediaUrl || '';
+        payload.fileName = content || (messageType === 'IMAGE' ? 'imagem.png' : messageType === 'AUDIO' ? 'audio.mp3' : 'documento.pdf');
       }
 
       const response = await fetch(`${EVOLUTION_API_URL}${endpoint}`, {

@@ -595,6 +595,9 @@ export async function createLead(
   let normalizedPhone = data.phone || null;
   if (normalizedPhone) {
     normalizedPhone = normalizedPhone.replace(/\D/g, '');
+    if (normalizedPhone && !normalizedPhone.startsWith('55')) {
+      normalizedPhone = '55' + normalizedPhone;
+    }
   }
 
   let lead = null;
@@ -767,6 +770,9 @@ export async function updateLead(
     let normalizedPhone = data.phone || null;
     if (normalizedPhone) {
       normalizedPhone = normalizedPhone.replace(/\D/g, '');
+      if (normalizedPhone && !normalizedPhone.startsWith('55')) {
+        normalizedPhone = '55' + normalizedPhone;
+      }
     }
     updateData.phone = normalizedPhone;
   }
@@ -1404,7 +1410,10 @@ export async function importLeadsAction(
         throw new Error(`E-mail inválido: "${row.email}"`);
       }
 
-      const phone = row.phone ? String(row.phone).replace(/\D/g, '') : null;
+      let phone = row.phone ? String(row.phone).replace(/\D/g, '') : null;
+      if (phone && !phone.startsWith('55')) {
+        phone = '55' + phone;
+      }
 
       let lead = null;
       let isNew = false;

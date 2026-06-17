@@ -66,8 +66,11 @@ export async function POST(
     
     let phone = null;
     if (rawPhone) {
-      // Remove caracteres não-numéricos
+      // Remove caracteres não-numéricos e garante DDI 55
       phone = String(rawPhone).replace(/\D/g, '');
+      if (phone && !phone.startsWith('55')) {
+        phone = '55' + phone;
+      }
     }
     
     const company = rawCompany ? String(rawCompany) : null;
