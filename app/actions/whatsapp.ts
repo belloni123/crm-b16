@@ -8,6 +8,62 @@ import crypto from 'crypto';
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
+// Função auxiliar para garantir que o webhook está configurado corretamente na Evolution API
+async function ensureWebhookConfigured(instanceName: string) {
+  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) return;
+  
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://crm.agenciab16.com.br';
+    const webhookUrl = `${baseUrl}/api/webhooks/whatsapp`;
+    
+    // 1. Tenta buscar a configuração de webhook atual
+    const findResponse = await fetch(`${EVOLUTION_API_URL}/webhook/find/${instanceName}`, {
+      method: 'GET',
+      headers: {
+        'apikey': EVOLUTION_API_KEY,
+      },
+    });
+    
+    let needsSetting = true;
+    if (findResponse.ok) {
+      const data = await findResponse.json();
+      if (data && data.enabled && data.url === webhookUrl) {
+        needsSetting = false;
+      }
+    }
+    
+    // 2. Se não estiver configurado ou estiver apontando para a URL errada, define o webhook
+    if (needsSetting) {
+      console.log(`[Webhook Auto-Config] Configurando webhook para ${instanceName} -> ${webhookUrl}`);
+      const setResponse = await fetch(`${EVOLUTION_API_URL}/webhook/set/${instanceName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': EVOLUTION_API_KEY,
+        },
+        body: JSON.stringify({
+          enabled: true,
+          url: webhookUrl,
+          webhook_by_events: false,
+          events: [
+            "MESSAGES_UPSERT",
+            "MESSAGES_UPDATE",
+            "CONNECTION_UPDATE"
+          ]
+        }),
+      });
+      
+      if (!setResponse.ok) {
+        console.error(`[Webhook Auto-Config] Falha ao configurar webhook para ${instanceName}:`, await setResponse.text());
+      } else {
+        console.log(`[Webhook Auto-Config] Webhook configurado com sucesso para ${instanceName}`);
+      }
+    }
+  } catch (err) {
+    console.error(`[Webhook Auto-Config] Erro ao assegurar webhook da instância ${instanceName}:`, err);
+  }
+}
+
 // ==========================================
 // GERENCIAMENTO DE INSTÂNCIAS
 // ==========================================
@@ -37,6 +93,11 @@ export async function getWhatsAppInstances(projectId: string) {
               const data = await response.json();
               const evolutionState = data.instance?.state;
               const newStatus = evolutionState === 'open' ? 'CONNECTED' : 'DISCONNECTED';
+              
+              // Garante que o webhook está ativo se a instância estiver conectada
+              if (newStatus === 'CONNECTED') {
+                await ensureWebhookConfigured(inst.instanceName);
+              }
               
               if (inst.status !== newStatus) {
                 const updated = await prisma.whatsAppInstance.update({
@@ -109,6 +170,9 @@ export async function createWhatsAppInstance(projectId: string, name: string, ty
 
       if (!response.ok) {
         console.error('Falha ao criar instância na Evolution API REST:', await response.text());
+      } else {
+        // Assegura que o webhook geral também está configurado
+        await ensureWebhookConfigured(instanceName);
       }
     } catch (err) {
       console.error('Erro de conexão ao tentar falar com Evolution API:', err);
@@ -133,6 +197,9 @@ export async function getQRCode(projectId: string, instanceId: string) {
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
     return { success: false, message: 'Evolution API não configurada no ambiente.' };
   }
+
+  // Garante que o webhook está configurado antes de conectar/mostrar o QR code
+  await ensureWebhookConfigured(instance.instanceName);
 
   try {
     const response = await fetch(`${EVOLUTION_API_URL}/instance/connect/${instance.instanceName}`, {

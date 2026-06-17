@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   createStage, 
   deleteStage,
@@ -26,7 +26,8 @@ import {
 import {
   createWhatsAppInstance,
   deleteWhatsAppInstance,
-  getQRCode
+  getQRCode,
+  getWhatsAppInstances
 } from '@/app/actions/whatsapp';
 import { 
   Settings, 
@@ -516,6 +517,28 @@ ${fieldsHtml}
   
   const [isPending, setIsPending] = useState(false);
   const [qrState, setQrState] = useState<{ instanceId: string; code: string | null; loading: boolean } | null>(null);
+
+  // Polling automático da conexão quando há QR Code ativo
+  useEffect(() => {
+    if (!qrState) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const instances = await getWhatsAppInstances(projectId);
+        setWhatsappList(instances as any);
+        
+        // Se a instância que estamos conectando agora mudou para CONNECTED, fecha o QR Code automaticamente
+        const currentInstance = instances.find(inst => inst.id === qrState.instanceId);
+        if (currentInstance && currentInstance.status === 'CONNECTED') {
+          setQrState(null);
+        }
+      } catch (err) {
+        console.error('Erro ao consultar status da conexão WhatsApp:', err);
+      }
+    }, 5000); // Consulta a cada 5 segundos
+
+    return () => clearInterval(interval);
+  }, [qrState, projectId]);
 
   // Estados para API Key
   const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(initialApiKeyPrefix || null);
@@ -1549,7 +1572,7 @@ ${fieldsHtml}
                       <Trash2 className="h-4 w-4" />
                     </button>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 pr-8">
                       <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
                         <MessageSquare className="h-4 w-4" />
                       </div>
@@ -1562,7 +1585,7 @@ ${fieldsHtml}
                       
                       <span className={`ml-auto px-2 py-0.5 rounded text-[9px] font-bold border ${
                         inst.status === 'CONNECTED' 
-                          ? 'bg-accent/10 text-accent border-accent/20' 
+                          ? 'bg-green-500/10 text-green-500 border-green-500/20' 
                           : 'bg-danger/10 text-danger border-danger/20'
                       }`}>
                         {inst.status === 'CONNECTED' ? 'CONECTADO' : 'DESCONECTADO'}
