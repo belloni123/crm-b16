@@ -1681,9 +1681,9 @@ export async function getProjectApiKeyInfo(projectId: string) {
 export async function generateProjectApiKey(projectId: string) {
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
 
-  // Gera token aleatório: nfs_ + 32 bytes hex (68 caracteres)
-  const token = 'nfs_' + crypto.randomBytes(32).toString('hex');
-  const prefix = token.substring(0, 12); // ex: nfs_ + 8 caracteres hex
+  // Gera token aleatório: b16_ + 32 bytes hex (68 caracteres)
+  const token = 'b16_' + crypto.randomBytes(32).toString('hex');
+  const prefix = token.substring(0, 12); // ex: b16_ + 8 caracteres hex
 
   // Hash bcrypt da chave completa
   const salt = bcrypt.genSaltSync(10);

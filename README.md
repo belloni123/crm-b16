@@ -157,15 +157,15 @@ A plataforma disponibiliza uma API REST integrada no padrão `/api/v1` para faci
 
 ### 🔐 Geração e Segurança de Chaves de API
 1. Acesse as **Configurações do Projeto > Desenvolvedor & API**.
-2. Clique em **Gerar Chave de API** para gerar um token aleatório seguro (ex: `b16_test_main_...`).
+2. Clique em **Gerar Chave de API** para gerar um token aleatório seguro (ex: `nfs_...`).
 3. > [!WARNING]
    > **Aviso de Exibição Única**: A chave de API inteira é mostrada **apenas uma vez** em um modal de aviso. Você deve copiá-la e salvá-la imediatamente. Após sair da tela, o CRM nunca mais exibirá a chave original.
 4. **Armazenamento de Alta Segurança**: Por motivos de conformidade e segurança, o CRM realiza o hash da sua chave completa usando `bcrypt` antes de persistir no banco de dados (a chave nunca é guardada legível). O banco armazena apenas o hash (`apiKeyHash`) e os primeiros 12 caracteres (`apiKeyPrefix`) como identificador visual e busca indexada.
 
 ### 🛡️ Autenticação e Rate Limiting
 * **Headers Aceitos**:
-  * `Authorization: Bearer b16_...` (Recomendado)
-  * `x-api-key: b16_...`
+  * `Authorization: Bearer <sua_chave>` (Recomendado)
+  * `x-api-key: <sua_chave>`
 * **Rate Limiting Protetivo**: Cada chave de API possui um teto de **60 requisições por minuto**.
   * Requisições que excederem o limite receberão a resposta `429 Too Many Requests` com o cabeçalho `Retry-After` informando os segundos restantes para liberação.
 
