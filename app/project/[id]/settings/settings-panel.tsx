@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   createStage, 
   deleteStage,
@@ -26,9 +26,13 @@ import {
 import {
   createWhatsAppInstance,
   deleteWhatsAppInstance,
-  getQRCode,
-  getWhatsAppInstances
+  getQRCode
 } from '@/app/actions/whatsapp';
+import {
+  getUserCalendarIntegrations,
+  disconnectCalendarIntegration
+} from '@/app/actions/calendar';
+import { Calendar } from 'lucide-react';
 import { 
   Settings, 
   Layers, 
@@ -193,8 +197,29 @@ export function SettingsPanel({
   initialForms,
 }: SettingsPanelProps) {
   const isAdmin = projectRole === 'PROJECT_ADMIN' || projectRole === 'SUPERADMIN';
-  const [activeTab, setActiveTab] = useState<'funnels' | 'tags' | 'origins' | 'losses' | 'custom' | 'webhooks' | 'whatsapp' | 'comerciais' | 'api' | 'forms' | 'appearance'>(isAdmin ? 'funnels' : 'forms');
+  const [activeTab, setActiveTab] = useState<'funnels' | 'tags' | 'origins' | 'losses' | 'custom' | 'webhooks' | 'whatsapp' | 'comerciais' | 'api' | 'forms' | 'appearance' | 'calendar'>(isAdmin ? 'funnels' : 'forms');
   const [currentTheme, setCurrentTheme] = useState('dark');
+
+  const [calendarStatus, setCalendarStatus] = useState<{
+    google: { connected: boolean; email: string | null };
+    microsoft: { connected: boolean; email: string | null };
+  }>({
+    google: { connected: false, email: null },
+    microsoft: { connected: false, email: null },
+  });
+  const [loadingCalendar, setLoadingCalendar] = useState(false);
+
+  const fetchCalendarIntegrations = React.useCallback(async () => {
+    setLoadingCalendar(true);
+    try {
+      const res = await getUserCalendarIntegrations();
+      setCalendarStatus(res);
+    } catch (err) {
+      console.error('Erro ao buscar integrações de agenda:', err);
+    } finally {
+      setLoadingCalendar(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -216,12 +241,18 @@ export function SettingsPanel({
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      const validTabs = ['funnels', 'tags', 'origins', 'losses', 'custom', 'webhooks', 'whatsapp', 'comerciais', 'api', 'forms', 'appearance'];
+      const validTabs = ['funnels', 'tags', 'origins', 'losses', 'custom', 'webhooks', 'whatsapp', 'comerciais', 'api', 'forms', 'appearance', 'calendar'];
       if (tabParam && validTabs.includes(tabParam)) {
         setActiveTab(tabParam as any);
       }
     }
   }, []);
+
+  React.useEffect(() => {
+    if (activeTab === 'calendar') {
+      fetchCalendarIntegrations();
+    }
+  }, [activeTab, fetchCalendarIntegrations]);
 
   // URL base para os webhooks de entrada e webhook da Evolution
   const baseUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host}` : 'http://localhost:3000';
@@ -430,18 +461,18 @@ export function SettingsPanel({
         const fieldType = f.fieldName === 'email' ? 'email' : 'text';
         const requiredAttr = f.required ? ' required' : '';
         const requiredAsterisk = f.required ? ' *' : '';
-        return `  <div class="b16-field">
-    <label class="b16-label">${f.label}${requiredAsterisk}</label>
-    <input type="${fieldType}" name="${f.fieldName}" class="b16-input"${requiredAttr} />
+        return `  <div class="nfs-field">
+    <label class="nfs-label">${f.label}${requiredAsterisk}</label>
+    <input type="${fieldType}" name="${f.fieldName}" class="nfs-input"${requiredAttr} />
   </div>`;
       })
       .join('\n\n');
 
-    return `<!-- B16 Embedded Form: ${form.name} -->
-<form action="${baseUrl}/api/forms/submit/${form.token}" method="POST" class="b16-form">
+    return `<!-- NFS Embedded Form: ${form.name} -->
+<form action="${baseUrl}/api/forms/submit/${form.token}" method="POST" class="nfs-form">
   <!-- Honeypot protection field against spam bots -->
   <div style="display: none !important;">
-    <input type="text" name="b16_hp_website" tabindex="-1" autocomplete="off" />
+    <input type="text" name="nfs_hp_website" tabindex="-1" autocomplete="off" />
   </div>
 
   <!-- Hidden tracking fields for campaigns (UTMs) -->
@@ -455,7 +486,7 @@ export function SettingsPanel({
 
 ${fieldsHtml}
 
-  <button type="submit" class="b16-button">Enviar</button>
+  <button type="submit" class="nfs-button">Enviar</button>
 </form>
 
 <script>
@@ -467,26 +498,26 @@ ${fieldsHtml}
     utms.forEach(function(key) {
       var val = params.get(key);
       if (val) {
-        localStorage.setItem('b16_' + key, val);
+        localStorage.setItem('nfs_' + key, val);
       }
     });
 
     // Registrar o referrer (página anterior) e url de entrada se não existirem no localStorage
-    if (document.referrer && !localStorage.getItem('b16_referrer')) {
-      localStorage.setItem('b16_referrer', document.referrer);
+    if (document.referrer && !localStorage.getItem('nfs_referrer')) {
+      localStorage.setItem('nfs_referrer', document.referrer);
     }
-    if (!localStorage.getItem('b16_url')) {
-      localStorage.setItem('b16_url', window.location.href);
+    if (!localStorage.getItem('nfs_url')) {
+      localStorage.setItem('nfs_url', window.location.href);
     }
 
     // Valores finais preenchidos (busca da URL, cai para o localStorage da primeira visita, ou fica vazio)
     var values = {
-      utm_source: params.get('utm_source') || localStorage.getItem('b16_utm_source') || '',
-      utm_medium: params.get('utm_medium') || localStorage.getItem('b16_utm_medium') || '',
-      utm_campaign: params.get('utm_campaign') || localStorage.getItem('b16_utm_campaign') || '',
-      utm_content: params.get('utm_content') || localStorage.getItem('b16_utm_content') || '',
-      utm_term: params.get('utm_term') || localStorage.getItem('b16_utm_term') || '',
-      referrer: document.referrer || localStorage.getItem('b16_referrer') || '',
+      utm_source: params.get('utm_source') || localStorage.getItem('nfs_utm_source') || '',
+      utm_medium: params.get('utm_medium') || localStorage.getItem('nfs_utm_medium') || '',
+      utm_campaign: params.get('utm_campaign') || localStorage.getItem('nfs_utm_campaign') || '',
+      utm_content: params.get('utm_content') || localStorage.getItem('nfs_utm_content') || '',
+      utm_term: params.get('utm_term') || localStorage.getItem('nfs_utm_term') || '',
+      referrer: document.referrer || localStorage.getItem('nfs_referrer') || '',
       url: window.location.href
     };
 
@@ -518,28 +549,6 @@ ${fieldsHtml}
   const [isPending, setIsPending] = useState(false);
   const [qrState, setQrState] = useState<{ instanceId: string; code: string | null; loading: boolean } | null>(null);
 
-  // Polling automático da conexão quando há QR Code ativo
-  useEffect(() => {
-    if (!qrState) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const instances = await getWhatsAppInstances(projectId);
-        setWhatsappList(instances as any);
-        
-        // Se a instância que estamos conectando agora mudou para CONNECTED, fecha o QR Code automaticamente
-        const currentInstance = instances.find(inst => inst.id === qrState.instanceId);
-        if (currentInstance && currentInstance.status === 'CONNECTED') {
-          setQrState(null);
-        }
-      } catch (err) {
-        console.error('Erro ao consultar status da conexão WhatsApp:', err);
-      }
-    }, 5000); // Consulta a cada 5 segundos
-
-    return () => clearInterval(interval);
-  }, [qrState, projectId]);
-
   // Estados para API Key
   const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(initialApiKeyPrefix || null);
   const [newGeneratedKey, setNewGeneratedKey] = useState<string | null>(null);
@@ -549,11 +558,11 @@ ${fieldsHtml}
 
   // Form de Estágio
   const [newStageName, setNewStageName] = useState('');
-  const [newStageColor, setNewStageColor] = useState('#d4a843');
+  const [newStageColor, setNewStageColor] = useState('#9FE870');
 
   // Form de Tag
   const [newTagName, setNewTagName] = useState('');
-  const [newTagColor, setNewTagColor] = useState('#d4a843');
+  const [newTagColor, setNewTagColor] = useState('#9FE870');
 
   // Form de Origem
   const [newOriginName, setNewOriginName] = useState('');
@@ -951,6 +960,7 @@ ${fieldsHtml}
           )}
           <TabButton active={activeTab === 'forms'} onClick={() => setActiveTab('forms')} icon={<FileText className="h-4 w-4" />} label="Formulários" />
           <TabButton active={activeTab === 'appearance'} onClick={() => setActiveTab('appearance')} icon={<Palette className="h-4 w-4" />} label="Aparência" />
+          <TabButton active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon={<Calendar className="h-4 w-4" />} label="Minha Agenda" />
         </div>
       </div>
 
@@ -1572,7 +1582,7 @@ ${fieldsHtml}
                       <Trash2 className="h-4 w-4" />
                     </button>
 
-                    <div className="flex items-center gap-3 pr-8">
+                    <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
                         <MessageSquare className="h-4 w-4" />
                       </div>
@@ -1585,7 +1595,7 @@ ${fieldsHtml}
                       
                       <span className={`ml-auto px-2 py-0.5 rounded text-[9px] font-bold border ${
                         inst.status === 'CONNECTED' 
-                          ? 'bg-green-500/10 text-green-500 border-green-500/20' 
+                          ? 'bg-accent/10 text-accent border-accent/20' 
                           : 'bg-danger/10 text-danger border-danger/20'
                       }`}>
                         {inst.status === 'CONNECTED' ? 'CONECTADO' : 'DESCONECTADO'}
@@ -1802,7 +1812,7 @@ ${fieldsHtml}
                   Regras importantes de segurança e uso da API:
                 </p>
                 <ul className="list-disc pl-4 space-y-1">
-                  <li>O token de API inteiro <code className="text-white">b16_...</code> <strong>só será exibido uma vez</strong> no momento da geração para você copiar. Guarde-o em local seguro!</li>
+                  <li>O token de API inteiro <code className="text-white">nfs_...</code> <strong>só será exibido uma vez</strong> no momento da geração para você copiar. Guarde-o em local seguro!</li>
                   <li>No banco de dados, guardamos apenas o hash da chave de API por motivos de segurança (a chave original nunca é exposta nem legível).</li>
                   <li><strong>Rate Limiting</strong>: Há um limite de até <strong>60 requisições por minuto</strong> por chave de API.</li>
                 </ul>
@@ -2299,6 +2309,139 @@ ${fieldsHtml}
         </div>
       )}
 
+      {/* ABA: AGENDA (CALENDAR INTEGRATIONS) */}
+      {activeTab === 'calendar' && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-md font-bold text-text-primary font-display mb-1">Minha Agenda Pessoal (Sincronização de Tarefas)</h2>
+            <p className="text-xs text-text-secondary">Conecte sua agenda pessoal para que as tarefas comerciais criadas por você no CRM sejam automaticamente sincronizadas.</p>
+          </div>
+
+          {loadingCalendar ? (
+            <div className="flex items-center justify-center py-12 text-xs text-text-secondary gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-accent" />
+              Carregando conexões de agenda...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+              {/* Card Google Calendar */}
+              <div className="bg-glass-2 border border-border-subtle p-5 rounded-2xl flex flex-col justify-between gap-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-9 w-9 bg-blue-600/10 border border-blue-600/25 rounded-xl flex items-center justify-center text-blue-500 font-bold text-sm">
+                        G
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Google Calendar</h4>
+                        <p className="text-[10px] text-text-tertiary">Google Agenda pessoal ou corporativo</p>
+                      </div>
+                    </div>
+
+                    {calendarStatus.google.connected ? (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-accent/15 border border-accent/25 text-accent">
+                        Integrado
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-glass-3 border border-border-subtle text-text-tertiary">
+                        Desconectado
+                      </span>
+                    )}
+                  </div>
+
+                  {calendarStatus.google.connected && (
+                    <div className="bg-glass-3 border border-border-subtle p-3 rounded-xl flex items-center justify-between">
+                      <div>
+                        <span className="text-[9px] font-bold text-text-tertiary uppercase block">Conta Conectada</span>
+                        <span className="text-xs font-semibold text-white">{calendarStatus.google.email}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {calendarStatus.google.connected ? (
+                  <button
+                    onClick={async () => {
+                      if (confirm('Tem certeza que deseja desconectar o Google Agenda?')) {
+                        await disconnectCalendarIntegration(projectId, 'GOOGLE');
+                        fetchCalendarIntegrations();
+                      }
+                    }}
+                    className="w-full py-2 bg-glass-3 hover:bg-danger/10 border border-border-subtle hover:border-danger/30 text-text-secondary hover:text-danger text-xs font-bold rounded-lg transition-all cursor-pointer"
+                  >
+                    Desconectar Google Agenda
+                  </button>
+                ) : (
+                  <a
+                    href={`/api/integrations/google/auth?projectId=${projectId}`}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-600/10"
+                  >
+                    Conectar Google Agenda
+                  </a>
+                )}
+              </div>
+
+              {/* Card Microsoft Calendar */}
+              <div className="bg-glass-2 border border-border-subtle p-5 rounded-2xl flex flex-col justify-between gap-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-9 w-9 bg-emerald-600/10 border border-emerald-600/25 rounded-xl flex items-center justify-center text-emerald-500 font-bold text-sm">
+                        M
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Outlook Calendar</h4>
+                        <p className="text-[10px] text-text-tertiary">Microsoft 365 ou Outlook.com pessoal</p>
+                      </div>
+                    </div>
+
+                    {calendarStatus.microsoft.connected ? (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-accent/15 border border-accent/25 text-accent">
+                        Integrado
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-glass-3 border border-border-subtle text-text-tertiary">
+                        Desconectado
+                      </span>
+                    )}
+                  </div>
+
+                  {calendarStatus.microsoft.connected && (
+                    <div className="bg-glass-3 border border-border-subtle p-3 rounded-xl flex items-center justify-between">
+                      <div>
+                        <span className="text-[9px] font-bold text-text-tertiary uppercase block">Conta Conectada</span>
+                        <span className="text-xs font-semibold text-white">{calendarStatus.microsoft.email}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {calendarStatus.microsoft.connected ? (
+                  <button
+                    onClick={async () => {
+                      if (confirm('Tem certeza que deseja desconectar o Outlook Agenda?')) {
+                        await disconnectCalendarIntegration(projectId, 'MICROSOFT');
+                        fetchCalendarIntegrations();
+                      }
+                    }}
+                    className="w-full py-2 bg-glass-3 hover:bg-danger/10 border border-border-subtle hover:border-danger/30 text-text-secondary hover:text-danger text-xs font-bold rounded-lg transition-all cursor-pointer"
+                  >
+                    Desconectar Outlook Agenda
+                  </button>
+                ) : (
+                  <a
+                    href={`/api/integrations/microsoft/auth?projectId=${projectId}`}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/10"
+                  >
+                    Conectar Outlook Agenda
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* MODAL DE CÓDIGO EMBUTIDO */}
       {embedForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2340,11 +2483,11 @@ ${fieldsHtml}
                   Você tem total liberdade para estilizar o formulário no CSS do seu site WordPress. O formulário é gerado com as seguintes classes semânticas:
                 </p>
                 <ul className="list-disc pl-4 space-y-1 text-text-secondary text-[11px] font-mono">
-                  <li><strong className="text-white">.b16-form</strong>: Aplica-se à tag &lt;form&gt; principal.</li>
-                  <li><strong className="text-white">.b16-field</strong>: Div contendo um campo (rótulo + input).</li>
-                  <li><strong className="text-white">.b16-label</strong>: A tag &lt;label&gt; do campo.</li>
-                  <li><strong className="text-white">.b16-input</strong>: Os campos de entrada (&lt;input type="text"&gt; ou &lt;input type="email"&gt;).</li>
-                  <li><strong className="text-white">.b16-button</strong>: O botão &lt;button type="submit"&gt; de envio.</li>
+                  <li><strong className="text-white">.nfs-form</strong>: Aplica-se à tag &lt;form&gt; principal.</li>
+                  <li><strong className="text-white">.nfs-field</strong>: Div contendo um campo (rótulo + input).</li>
+                  <li><strong className="text-white">.nfs-label</strong>: A tag &lt;label&gt; do campo.</li>
+                  <li><strong className="text-white">.nfs-input</strong>: Os campos de entrada (&lt;input type="text"&gt; ou &lt;input type="email"&gt;).</li>
+                  <li><strong className="text-white">.nfs-button</strong>: O botão &lt;button type="submit"&gt; de envio.</li>
                 </ul>
               </div>
             </div>

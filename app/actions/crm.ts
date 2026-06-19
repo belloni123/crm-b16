@@ -15,6 +15,7 @@ import crypto from 'crypto';
 import { getPhoneVariants } from '@/lib/utils';
 import bcrypt from 'bcryptjs';
 import { sendPasswordResetEmail } from '@/lib/mail';
+import { syncTaskToAllCalendars } from '@/lib/calendar';
 
 // ==========================================
 // FUNIS E ESTÁGIOS
@@ -595,9 +596,6 @@ export async function createLead(
   let normalizedPhone = data.phone || null;
   if (normalizedPhone) {
     normalizedPhone = normalizedPhone.replace(/\D/g, '');
-    if (normalizedPhone && !normalizedPhone.startsWith('55')) {
-      normalizedPhone = '55' + normalizedPhone;
-    }
   }
 
   let lead = null;
@@ -770,9 +768,6 @@ export async function updateLead(
     let normalizedPhone = data.phone || null;
     if (normalizedPhone) {
       normalizedPhone = normalizedPhone.replace(/\D/g, '');
-      if (normalizedPhone && !normalizedPhone.startsWith('55')) {
-        normalizedPhone = '55' + normalizedPhone;
-      }
     }
     updateData.phone = normalizedPhone;
   }
@@ -989,9 +984,11 @@ export async function createTask(
     dueDate?: string;
     leadId?: string;
     status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+    userId?: string;
   }
 ) {
   const { user } = await requireProjectAccess(projectId);
+  const assigneeId = data.userId || user.id;
 
   const task = await prisma.task.create({
     data: {
@@ -1001,6 +998,7 @@ export async function createTask(
       status: data.status || 'PENDING',
       leadId: data.leadId || null,
       projectId,
+      userId: assigneeId,
     },
   });
 
@@ -1013,6 +1011,11 @@ export async function createTask(
         content: `Tarefa criada: "${data.title}".`,
       },
     });
+  }
+
+  // Sincroniza com a agenda
+  if (task.dueDate && task.userId) {
+    await syncTaskToAllCalendars(task.userId, task, 'CREATE');
   }
 
   revalidatePath(`/project/${projectId}`);
@@ -1028,6 +1031,7 @@ export async function updateTask(
     description?: string;
     dueDate?: string | null;
     status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+    userId?: string;
   }
 ) {
   const { user } = await requireProjectAccess(projectId);
@@ -1044,6 +1048,7 @@ export async function updateTask(
   if (data.title !== undefined) updateData.title = data.title;
   if (data.description !== undefined) updateData.description = data.description;
   if (data.status !== undefined) updateData.status = data.status;
+  if (data.userId !== undefined) updateData.userId = data.userId;
   if (data.dueDate !== undefined) {
     updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
   }
@@ -1064,6 +1069,22 @@ export async function updateTask(
     });
   }
 
+  // Sincroniza com a agenda
+  if (originalTask.userId && originalTask.userId !== task.userId) {
+    // Apaga na agenda do antigo responsável
+    await syncTaskToAllCalendars(originalTask.userId, originalTask, 'DELETE');
+    // Cria na agenda do novo responsável
+    const resetTask = await prisma.task.update({
+      where: { id: taskId },
+      data: { googleEventId: null, microsoftEventId: null },
+    });
+    if (resetTask.userId) {
+      await syncTaskToAllCalendars(resetTask.userId, resetTask, 'CREATE');
+    }
+  } else if (task.userId) {
+    await syncTaskToAllCalendars(task.userId, task, 'UPDATE');
+  }
+
   revalidatePath(`/project/${projectId}`);
   revalidatePath(`/project/${projectId}/tasks`);
   return task;
@@ -1075,6 +1096,11 @@ export async function deleteTask(projectId: string, taskId: string) {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task || task.projectId !== projectId) {
     throw new Error('Tarefa não encontrada.');
+  }
+
+  // Sincroniza exclusão na agenda do responsável
+  if (task.userId) {
+    await syncTaskToAllCalendars(task.userId, task, 'DELETE');
   }
 
   await prisma.task.delete({
@@ -1410,10 +1436,7 @@ export async function importLeadsAction(
         throw new Error(`E-mail inválido: "${row.email}"`);
       }
 
-      let phone = row.phone ? String(row.phone).replace(/\D/g, '') : null;
-      if (phone && !phone.startsWith('55')) {
-        phone = '55' + phone;
-      }
+      const phone = row.phone ? String(row.phone).replace(/\D/g, '') : null;
 
       let lead = null;
       let isNew = false;
@@ -1658,9 +1681,9 @@ export async function getProjectApiKeyInfo(projectId: string) {
 export async function generateProjectApiKey(projectId: string) {
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
 
-  // Gera token aleatório: b16_ + 32 bytes hex (68 caracteres)
-  const token = 'b16_' + crypto.randomBytes(32).toString('hex');
-  const prefix = token.substring(0, 12); // ex: b16_ + 8 caracteres hex
+  // Gera token aleatório: nfs_ + 32 bytes hex (68 caracteres)
+  const token = 'nfs_' + crypto.randomBytes(32).toString('hex');
+  const prefix = token.substring(0, 12); // ex: nfs_ + 8 caracteres hex
 
   // Hash bcrypt da chave completa
   const salt = bcrypt.genSaltSync(10);
@@ -1733,7 +1756,7 @@ export async function createForm(
     throw new Error('O formulário deve conter pelo menos um campo identificador (E-mail ou Telefone) para fins de deduplicação.');
   }
 
-  const token = 'b16_form_' + crypto.randomBytes(24).toString('hex');
+  const token = 'nfs_form_' + crypto.randomBytes(24).toString('hex');
 
   const form = await prisma.form.create({
     data: {

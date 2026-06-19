@@ -1,6 +1,6 @@
 # Manual do Usuário — Operações de Kanbans, Webhooks e Leads
 
-Este manual fornece instruções passo a passo com exemplos práticos sobre como utilizar os novos recursos de múltiplos Kanbans, roteamento de webhooks, importação CSV e distribuição round-robin na plataforma CRM b16.
+Este manual fornece instruções passo a passo com exemplos práticos sobre como utilizar os novos recursos de múltiplos Kanbans, roteamento de webhooks, importação CSV e distribuição round-robin na plataforma No Front Scale.
 
 ---
 
@@ -95,13 +95,13 @@ Utilize este procedimento para capturar leads através de um formulário gerado 
 6. Na listagem de formulários, localize a opção criada e clique em **Embutir Code**.
 7. Clique no botão **Copiar Código** no modal de visualização.
 8. No editor do seu site WordPress (Gutenberg, Elementor, etc.), adicione um bloco de **HTML Personalizado** e cole o código copiado.
-9. Você pode customizar os estilos visuais livremente em seu CSS utilizando as classes `.b16-form`, `.b16-field`, `.b16-label`, `.b16-input` e `.b16-button`.
+9. Você pode customizar os estilos visuais livremente em seu CSS utilizando as classes `.nfs-form`, `.nfs-field`, `.nfs-label`, `.nfs-input` e `.nfs-button`.
 
 ---
 
 ## 📈 6. Rastreamento Automático de Campanhas (UTMs)
 
-Quando você utiliza tráfego pago (Google Ads, Facebook Ads) ou campanhas estruturadas, os links que trazem os visitantes ao seu site costumam ter tags como `utm_source=facebook` ou `utm_campaign=promocao`. O CRM CRM b16 captura estes dados automaticamente e armazena de forma isolada nos leads.
+Quando você utiliza tráfego pago (Google Ads, Facebook Ads) ou campanhas estruturadas, os links que trazem os visitantes ao seu site costumam ter tags como `utm_source=facebook` ou `utm_campaign=promocao`. O CRM No Front Scale captura estes dados automaticamente e armazena de forma isolada nos leads.
 
 ### Como Funciona:
 1. **Configuração nos Anúncios:** Você não precisa fazer nenhuma configuração adicional no CRM ou no formulário embutido. Basta montar o link do seu anúncio ou postagem incluindo os parâmetros UTM normais (ex: `https://seusite.com/?utm_source=instagram&utm_medium=stories&utm_campaign=imersao-ago`).
@@ -123,10 +123,29 @@ Se você ou um membro da equipe esquecer a senha de acesso, a plataforma possui 
 
 ### Passo a Passo:
 1. Na página inicial de login do CRM, clique no link **Esqueci minha senha** localizado logo acima do campo de Senha.
-2. Digite o seu e-mail cadastrado no sistema (ex: `admin@crmb16.com.br`) e clique em **Recuperar Senha**.
+2. Digite o seu e-mail cadastrado no sistema (ex: `admin@nofrontscale.com.br`) e clique em **Recuperar Senha**.
 3. Uma tela de confirmação será exibida informando que as instruções foram enviadas.
 4. **Simulação no Ambiente de Desenvolvimento (Sem SMTP local):**
    * Como o ambiente local não possui um servidor de e-mail ativo para disparos reais, um painel especial de depuração (Alerta de Teste) aparecerá na tela de sucesso.
    * Clique no botão **Redefinir Senha de Teste** para simular o recebimento do e-mail. Isso abrirá a página segura de redefinição em `/reset-password?token=...`.
 5. Na tela **Criar Nova Senha**, digite a nova senha desejada (mínimo de 6 caracteres) e confirme-a.
 6. Clique em **Salvar Nova Senha**. Após a confirmação, você será redirecionado para a tela de login principal, onde poderá acessar o painel usando suas novas credenciais.
+
+---
+
+## 📅 8. Integração de Agenda Pessoal (Google & Microsoft)
+
+Esta funcionalidade permite que cada vendedor ou administrador conecte sua própria agenda pessoal (Google Calendar ou Microsoft Outlook/Exchange) ao CRM. As tarefas com data de vencimento que você criar ou que forem atribuídas a você serão automaticamente sincronizadas como compromissos/eventos na sua agenda pessoal.
+
+### Passo a Passo:
+1. Acesse o menu **Configurações** (ícone de engrenagem) no menu lateral esquerdo.
+2. Selecione a aba **Minha Agenda** no menu de configurações (disponível para todos os usuários).
+3. Escolha o provedor de sua preferência:
+   * **Google Calendar**: Clique em **Conectar Google Agenda**. Você será redirecionado para a página de login e consentimento do Google. Autorize a plataforma a ler e escrever eventos em sua agenda.
+   * **Outlook Calendar**: Clique em **Conectar Outlook Agenda**. Você será redirecionado para a página de consentimento da Microsoft. Autorize a plataforma.
+4. Após o consentimento, você será redirecionado de volta para as Configurações do CRM, exibindo o status **Integrado** e o e-mail da conta de agenda vinculada.
+5. **Funcionamento da Sincronização:**
+   * Sempre que você criar uma nova tarefa com **data de vencimento**, ela será criada como um evento de 1 hora na sua agenda externa com o título `CRM: [Título da Tarefa]`.
+   * Se você editar o título, descrição, data de vencimento ou se a tarefa for concluída, a alteração será refletida na sua agenda pessoal externa em tempo real.
+   * Se a tarefa for excluída do CRM, o respectivo evento também será removido da sua agenda externa.
+6. Para remover uma integração a qualquer momento, basta acessar novamente a aba **Minha Agenda** e clicar em **Desconectar [Google/Outlook] Agenda**.
