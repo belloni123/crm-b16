@@ -2400,8 +2400,8 @@ ${fieldsHtml}
                         Integrado
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-glass-3 border border-border-subtle text-text-tertiary">
-                        Desconectado
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-amber-500/10 border border-amber-500/25 text-amber-500">
+                        Em breve
                       </span>
                     )}
                   </div>
@@ -2429,12 +2429,12 @@ ${fieldsHtml}
                     Desconectar Outlook Agenda
                   </button>
                 ) : (
-                  <a
-                    href={`/api/integrations/microsoft/auth?projectId=${projectId}`}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/10"
+                  <button
+                    disabled
+                    className="w-full py-2 bg-glass-3 border border-border-subtle text-text-tertiary text-xs font-bold rounded-lg cursor-not-allowed opacity-60 flex items-center justify-center gap-2"
                   >
-                    Conectar Outlook Agenda
-                  </a>
+                    Disponível em Breve
+                  </button>
                 )}
               </div>
             </div>
