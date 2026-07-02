@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getPhoneVariants } from '@/lib/utils';
+import { getPhoneVariants, isGenericWhatsAppName } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -146,12 +146,28 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const stablePushName = !isGenericWhatsAppName(pushName, cleanPhone, instance.name) ? pushName : null;
+    const fallbackContactName = matchedLead?.name || stablePushName;
+
+    if (!conversation && fallbackContactName) {
+      conversation = await prisma.conversation.findFirst({
+        where: {
+          instanceId: instance.id,
+          name: {
+            equals: fallbackContactName,
+            mode: 'insensitive',
+          },
+        },
+        orderBy: { lastMessageAt: 'desc' },
+      });
+    }
+
     if (!conversation) {
-      // Se a mensagem for outbound (enviada por nós), o pushName costuma ser o do próprio dono da instância.
-      // Nesse caso, preferimos usar o nome do lead correspondente ou o próprio número para não criar a conversa com o nome do dono.
+      // Prefer a matched lead or a stable contact name. Some Evolution payloads use non-phone
+      // WhatsApp IDs, so the name fallback keeps sent/received messages in one thread.
       const conversationName = fromMe
-        ? (matchedLead?.name || cleanPhone)
-        : (pushName || matchedLead?.name || cleanPhone);
+        ? (fallbackContactName || cleanPhone)
+        : (fallbackContactName || cleanPhone);
 
       conversation = await prisma.conversation.create({
         data: {
@@ -167,16 +183,10 @@ export async function POST(request: NextRequest) {
       
       // Só atualiza o nome com pushName se for uma mensagem inbound (não enviada por nós)
       // e se o nome atual for apenas o número de telefone ou o nome da instância (para corrigir históricos)
-      const isGenericName = 
-        conversation.name === conversation.whatsappId || 
-        conversation.name === cleanPhone ||
-        conversation.name === instance.name ||
-        conversation.name.includes('/B16');
+      const isGenericName = isGenericWhatsAppName(conversation.name, conversation.whatsappId, instance.name);
 
-      if (pushName && !fromMe && isGenericName) {
-        updateData.name = pushName;
-      } else if (!fromMe && matchedLead && isGenericName) {
-        updateData.name = matchedLead.name;
+      if (fallbackContactName && isGenericName) {
+        updateData.name = fallbackContactName;
       }
 
       if (!conversation.leadId && matchedLead) {

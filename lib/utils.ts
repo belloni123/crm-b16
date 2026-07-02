@@ -69,3 +69,39 @@ export function getPhoneVariants(phone: string): string[] {
 
   return Array.from(variants);
 }
+
+export function isLikelyBrazilianPhoneId(value: string | null | undefined): boolean {
+  const cleaned = (value || '').replace(/\D/g, '');
+  if (!cleaned) return false;
+
+  if (cleaned.startsWith('55')) {
+    return cleaned.length === 12 || cleaned.length === 13;
+  }
+
+  return cleaned.length === 10 || cleaned.length === 11;
+}
+
+export function normalizeContactName(name: string | null | undefined): string {
+  return (name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+export function isGenericWhatsAppName(
+  name: string | null | undefined,
+  whatsappId?: string | null,
+  instanceName?: string | null
+): boolean {
+  const normalizedName = normalizeContactName(name);
+  if (!normalizedName) return true;
+
+  return (
+    normalizedName === normalizeContactName(whatsappId) ||
+    normalizedName === normalizeContactName(instanceName) ||
+    normalizedName.includes('/b16') ||
+    /^\d+$/.test(normalizedName)
+  );
+}

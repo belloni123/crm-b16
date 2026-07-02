@@ -1,5 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-import { getPhoneVariants } from '../lib/utils';
+import {
+  getPhoneVariants,
+  isGenericWhatsAppName,
+  isLikelyBrazilianPhoneId,
+  normalizeContactName,
+} from '../lib/utils';
 
 const prisma = new PrismaClient();
 
@@ -35,16 +40,30 @@ async function main() {
     const instanceName = instance?.name || '';
     console.log(`\nProcessing instance: "${instanceName}" (ID: ${instanceId})`);
 
-    // Group conversations by contact phone variants
+    // Group conversations by contact phone variants, falling back to stable names
+    // for Evolution payloads where remoteJid is a non-phone WhatsApp ID.
     const groups: (typeof conversations)[] = [];
 
     for (const conv of instConversations) {
       const variants = getPhoneVariants(conv.whatsappId);
+      const nameKey = !isLikelyBrazilianPhoneId(conv.whatsappId) && !isGenericWhatsAppName(conv.name, conv.whatsappId, instanceName)
+        ? normalizeContactName(conv.name)
+        : null;
       
       // Find an existing group where any conversation matches these variants
       let foundGroup = false;
       for (const group of groups) {
-        if (group.some((gc) => variants.includes(gc.whatsappId) || getPhoneVariants(gc.whatsappId).includes(conv.whatsappId))) {
+        if (group.some((gc) => {
+          const groupNameKey = !isLikelyBrazilianPhoneId(gc.whatsappId) && !isGenericWhatsAppName(gc.name, gc.whatsappId, instanceName)
+            ? normalizeContactName(gc.name)
+            : null;
+
+          return (
+            variants.includes(gc.whatsappId) ||
+            getPhoneVariants(gc.whatsappId).includes(conv.whatsappId) ||
+            (!!nameKey && nameKey === groupNameKey)
+          );
+        })) {
           group.push(conv);
           foundGroup = true;
           break;
@@ -71,10 +90,7 @@ async function main() {
         let score = 0;
         
         // Prefer conversations that are NOT named after the instance owner or are just digits
-        const isGenericName = 
-          c.name === c.whatsappId || 
-          c.name === instanceName || 
-          c.name.includes('/B16');
+        const isGenericName = isGenericWhatsAppName(c.name, c.whatsappId, instanceName);
         
         if (!isGenericName) {
           score += 100; // Strong preference for a specific contact name (e.g. Thiago Santos)
@@ -120,15 +136,8 @@ async function main() {
         }
 
         // Inherit contact name if primary name is generic and redundant is not
-        const primaryIsGeneric = 
-          updatedName === primary.whatsappId || 
-          updatedName === instanceName || 
-          updatedName.includes('/B16');
-
-        const redundantIsGeneric = 
-          redundant.name === redundant.whatsappId || 
-          redundant.name === instanceName || 
-          redundant.name.includes('/B16');
+        const primaryIsGeneric = isGenericWhatsAppName(updatedName, primary.whatsappId, instanceName);
+        const redundantIsGeneric = isGenericWhatsAppName(redundant.name, redundant.whatsappId, instanceName);
 
         if (primaryIsGeneric && !redundantIsGeneric) {
           updatedName = redundant.name;
