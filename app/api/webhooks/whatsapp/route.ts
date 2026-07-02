@@ -137,21 +137,26 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 3. Encontra ou cria a conversa
-    let conversation = await prisma.conversation.findUnique({
+    // 3. Encontra ou cria a conversa usando variantes do número de telefone
+    const phoneVariants = getPhoneVariants(cleanPhone);
+    let conversation = await prisma.conversation.findFirst({
       where: {
-        whatsappId_instanceId: {
-          whatsappId: cleanPhone,
-          instanceId: instance.id,
-        },
+        instanceId: instance.id,
+        whatsappId: { in: phoneVariants },
       },
     });
 
     if (!conversation) {
+      // Se a mensagem for outbound (enviada por nós), o pushName costuma ser o do próprio dono da instância.
+      // Nesse caso, preferimos usar o nome do lead correspondente ou o próprio número para não criar a conversa com o nome do dono.
+      const conversationName = fromMe
+        ? (matchedLead?.name || cleanPhone)
+        : (pushName || matchedLead?.name || cleanPhone);
+
       conversation = await prisma.conversation.create({
         data: {
           whatsappId: cleanPhone,
-          name: pushName || cleanPhone,
+          name: conversationName,
           instanceId: instance.id,
           leadId: matchedLead?.id || null,
         },
@@ -159,9 +164,21 @@ export async function POST(request: NextRequest) {
     } else {
       // Atualiza o nome se tiver e o lead se tiver mudado / encontrado agora
       const updateData: any = { lastMessageAt: new Date() };
-      if (pushName && conversation.name === cleanPhone) {
+      
+      // Só atualiza o nome com pushName se for uma mensagem inbound (não enviada por nós)
+      // e se o nome atual for apenas o número de telefone ou o nome da instância (para corrigir históricos)
+      const isGenericName = 
+        conversation.name === conversation.whatsappId || 
+        conversation.name === cleanPhone ||
+        conversation.name === instance.name ||
+        conversation.name.includes('/B16');
+
+      if (pushName && !fromMe && isGenericName) {
         updateData.name = pushName;
+      } else if (!fromMe && matchedLead && isGenericName) {
+        updateData.name = matchedLead.name;
       }
+
       if (!conversation.leadId && matchedLead) {
         updateData.leadId = matchedLead.id;
       }
