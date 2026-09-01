@@ -47,14 +47,14 @@ O banco já possuía seis webhooks de entrada antigos apontando para etapas hoje
 | Criptografar headers e não devolvê-los à UI | Unitário + revisão do fluxo | Aprovado |
 | Bloquear localhost, rede privada e credencial na URL | Unitário | Aprovado |
 | Sanitizar logs de webhook | Unitário | Aprovado |
-| Falha de login e recuperação de senha | Smoke manual em produção anterior | Aprovado |
-| API sem chave e tokens públicos inválidos | Smoke HTTP em produção anterior | 401/400/404 conforme esperado |
+| Falha de login e recuperação de senha | Smoke manual antes e depois do deploy | Aprovado |
+| API sem chave e tokens públicos inválidos | Smoke HTTP antes e depois do deploy | 401/404 conforme esperado |
 
 ## Segurança e dependências
 
 O Next.js foi atualizado para 16.3.4 seguindo a convenção `proxy.ts` da versão atual. `next-auth` foi atualizado para 4.24.15 e Nodemailer para 9.1.1, que corrige os avisos atuais. O `next-auth` ainda declara uma faixa opcional antiga para Nodemailer; o build e a API usada pelo CRM são compatíveis, e a instalação do container usa `--legacy-peer-deps` até que o upstream amplie essa faixa.
 
-Segredos deixaram de existir no Compose versionado. Como valores antigos permanecem recuperáveis no histórico Git, a rotação operacional continua recomendada. Nenhum segredo é reproduzido neste documento.
+Segredos deixaram de existir no Compose versionado. A senha do papel PostgreSQL e o segredo de sessão foram rotacionados durante a publicação, e uma chave independente de 64 caracteres foi configurada para headers de webhooks. Como a credencial histórica da Evolution API ainda permanece recuperável no Git, sua rotação coordenada com o serviço de WhatsApp continua recomendada. Nenhum segredo é reproduzido neste documento.
 
 ## Critérios pós-deploy
 
@@ -66,4 +66,62 @@ Segredos deixaram de existir no Compose versionado. Como valores antigos permane
 - login inválido, recuperação, API sem chave e tokens inválidos mantendo os contratos;
 - ausência de erro novo no console e nos logs do deploy.
 
-O resultado pós-deploy, commit e horário serão acrescentados ao final desta página após a publicação.
+## Resultado pós-deploy
+
+- Repositório: `belloni123/crm-b16`, branch `main`.
+- Commit funcional validado: `fff120d1e0b8feb7290a7ca89193758a9114db95`.
+- Commit efetivamente publicado: `8173bbd7f4cd8484567f22608917597f2c6bd3ef`.
+- Coolify: deploy manual concluído com status **Success** em 2026-09-01; aplicação e PostgreSQL `running/healthy`.
+- Migration nova aplicada automaticamente; as três entradas estão finalizadas e sem rollback.
+- Next.js iniciou em 417 ms após a migration.
+- Healthcheck externo: `GET /api/health` → 200 com `{"status":"ok"}`.
+
+A primeira tentativa, em `fff120d`, não executou a migration nem iniciou o serviço web: a sintaxe `${VAR:?mensagem}` foi interpretada pelo gerenciador de variáveis do Coolify como valor literal, deixando somente o PostgreSQL em execução. O volume permaneceu intacto. O Compose foi corrigido para interpolação portátil e healthcheck sem credenciais; a segunda tentativa, em `8173bbd`, foi concluída normalmente.
+
+### Contagens antes e depois
+
+| Tabela | Antes | Depois |
+|---|---:|---:|
+| User | 5 | 5 |
+| Project | 6 | 6 |
+| Membership | 17 | 17 |
+| Pipeline | 6 | 6 |
+| Stage | 34 | 34 |
+| Origin | 12 | 12 |
+| LostStatus | 20 | 20 |
+| Lead | 310 | 310 |
+| PipelineEntry | 269 | 269 |
+| CustomFieldDefinition | 5 | 5 |
+| CustomFieldValue | 8 | 8 |
+| Tag | 16 | 16 |
+| Task | 8 | 8 |
+| Activity | 1.378 | 1.378 |
+| WebhookEndpoint | 10 | 10 |
+| WebhookLog | 355 | 355 |
+| WhatsAppInstance | 4 | 4 |
+| Conversation | 76 | 76 |
+| Message | 633 | 633 |
+| Form | 4 | 4 |
+| FormField | 14 | 14 |
+| CalendarIntegration | 1 | 1 |
+
+Após a migration: zero vínculos pipeline/projeto cruzados, zero valores customizados cruzados, zero formulários com destino incompatível, zero ordens duplicadas de etapa e zero valores customizados duplicados. Os seis webhooks antigos com etapa inválida e os 41 leads sem pipeline permaneceram inalterados.
+
+### Smoke tests de produção
+
+| Teste | Resultado |
+|---|---|
+| `GET /` | 200 |
+| `GET /project` sem sessão | 307 para login |
+| `GET /api/v1/leads` sem chave | 401 |
+| Formulário com token sintético inválido | 404 |
+| Webhook de entrada com token sintético inválido | 404 |
+| Login inválido | Mensagem segura, sem navegação |
+| Recuperação com e-mail sintético inexistente | Resposta genérica, sem enumeração |
+| Console do navegador | 0 erros |
+| Logs do serviço | Migration aplicada, Next.js pronto, sem erro novo |
+| Layout desktop | Renderização visual aprovada, identidade B16 preservada |
+
+### Limite de cobertura autenticada
+
+Não havia conta de QA autorizada nem sessão autenticada disponível no navegador conectado; a integração com Chrome também não estava disponível. Por segurança, não foi criada, redefinida ou removida uma conta real e nenhum lead de produção foi alterado apenas para teste. Assim, login positivo/logout, CRUD visual de usuário e lead, arraste do Kanban e CRUD visual de campos/webhooks não foram repetidos como E2E no domínio. Esses caminhos foram cobertos por testes automatizados das regras, validações de autorização, build/TypeScript, revisão dos fluxos e integridade pós-deploy, mas ainda constituem a principal lacuna manual desta rodada.

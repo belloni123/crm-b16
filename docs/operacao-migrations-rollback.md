@@ -30,6 +30,10 @@ O container não executa mais seed nem `db push` no boot. O fluxo passa a ser:
 5. healthcheck `/api/health`;
 6. smoke tests e comparação de contagens.
 
+No Coolify 4.3.14, não usar a forma `${VAR:?mensagem}` no `docker-compose.yml`: o parser de variáveis do painel pode materializar a mensagem como valor. As variáveis obrigatórias são declaradas como `${VAR}` e sua presença deve ser validada no painel e no container. O healthcheck do PostgreSQL usa apenas host e porta; a autenticação real é validada por `prisma migrate status` e pelo healthcheck da aplicação.
+
+Na publicação de 2026-09-01, a primeira tentativa foi interrompida antes da migration por esse comportamento do parser. O volume não foi recriado. A senha do PostgreSQL e o segredo de sessão foram rotacionados, a configuração foi corrigida e o deploy `8173bbd7f4cd8484567f22608917597f2c6bd3ef` terminou saudável.
+
 ## Rollback
 
 Esta migration é aditiva, salvo por tornar `WebhookEndpoint.targetStageId` opcional e criar índices. O rollback preferencial é de aplicação: redeploy do commit anterior, mantendo as novas colunas no banco. O código anterior ignora essas colunas, evitando perda de dados.
