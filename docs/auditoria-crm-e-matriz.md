@@ -8,9 +8,10 @@ Data da auditoria: 2026-09-01. Este documento registra apenas metadados técnico
 - Repositório: `belloni123/crm-b16`.
 - Branch de produção antes desta evolução: `main`.
 - Commit local, remoto e código do container antes da evolução: `acfd61e1517d41b4988cf41161d93524c2785050`.
+- Commit da aplicação publicado e validado no Coolify: `8173bbd7f4cd8484567f22608917597f2c6bd3ef`.
 - Coolify: aplicação de produção baseada em `main`, Compose `docker-compose.yml`.
-- A pasta `Desktop/CRM B16` não é repositório e contém somente dependências geradas.
-- A pasta `Desktop/crm-trycompai` é o CRM de referência, não uma cópia da B16.
+- A pasta `Desktop/CRM B16` não era repositório e continha somente dependências geradas; foi movida de forma recuperável para a Lixeira como `CRM B16-20260901`.
+- A pasta `Desktop/crm-trycompai` era o CRM de referência, não uma cópia da B16. Depois da auditoria, dependências, caches, clientes gerados e o ambiente local da Vercel foram descartados, e o restante do repositório foi movido para a Lixeira como `crm-trycompai-20260901`.
 - A referência possui alterações locais de modo demo/bypass de autenticação. Elas foram classificadas como inseguras e não foram incorporadas.
 
 ## CRM de referência
