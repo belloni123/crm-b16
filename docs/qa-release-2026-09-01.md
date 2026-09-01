@@ -27,6 +27,18 @@ Depois da primeira publicação, a configuração de entrada ainda expunha apena
 | Whitespace/patch | `git diff --check` aprovado |
 | Alteração de banco | Nenhuma migration; o mapeamento versionado usa a coluna já existente |
 
+### Resultado da publicação corretiva
+
+- Commit publicado: `148d9f9420a0e93632b7c8eb07723143ef5f62e6`.
+- Deploy manual Coolify `p5pfhljxdfllrxpbzf9tm2bh`: **Success** em 2m04s.
+- Imagem em execução corresponde exatamente ao commit; PostgreSQL `running/healthy` e aplicação `running`.
+- Bundle de produção contém o novo construtor (`webhook_builder_bundle=present`).
+- Migrations: nenhuma pendente; Next.js pronto em 226 ms.
+- Backup pré-deploy validado por catálogo: `/var/lib/postgresql/data/manual-backups/crm-b16-pre-webhook-builder-20260901-v3.dump` (275,9 KiB). Duas tentativas vazias produzidas durante o ajuste do comando foram removidas; o dump validado foi preservado.
+- Contagens antes/depois: 311 leads, 5 definições e 8 valores personalizados, 10 endpoints, 356 logs, 34 etapas e 6 pipelines — sem alteração.
+- Smoke HTTP: `/api/health` 200, `/` 200, `/project` 307 para login, API sem chave 401 e token de webhook sintético inválido 404.
+- Smoke visual não autenticado: tela de login renderizada no domínio de produção. O CRUD visual autenticado permanece dependente da sessão do usuário no Chrome, que não estava disponível para automação nesta rodada.
+
 ## Escopo
 
 - evolução segura de campos personalizados;
