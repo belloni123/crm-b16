@@ -50,6 +50,14 @@ Depois da primeira publicação, a configuração de entrada ainda expunha apena
 - QA HTTP local: página de acesso negado 200, rota inexistente 404 e rota protegida sem sessão 307 para login.
 - Gates finais locais: 16/16 testes, TypeScript e build de produção aprovados, 12/12 páginas estáticas, auditoria com 0 vulnerabilidades e ESLint com 0 erros/37 avisos preexistentes fora das telas novas.
 
+### Resultado da publicação das páginas de erro
+
+- Commit publicado: `9de69bd02fbc74c0dc047abb7710e19e6e415f22`.
+- Deploy manual Coolify `xmisyhjvjxkongj66qrfli4c`: **Success** em 2m04s; aplicação `running` e PostgreSQL `healthy`.
+- Build remoto aprovado com Next.js 16.3.4, TypeScript e 12/12 páginas estáticas; a rota dinâmica `/acesso-negado` foi incluída no artefato.
+- Smoke HTTP de produção: `/` 200, `/api/health` 200 com `{"status":"ok"}`, `/project` 307 para login, `/acesso-negado?reason=project` 200 e rota inexistente 404.
+- Smoke visual de produção: acesso negado exibe a orientação para falar com o administrador; rota inexistente exibe a nova tela 404 com navegação de retorno.
+
 ## Escopo
 
 - evolução segura de campos personalizados;
