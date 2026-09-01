@@ -2,6 +2,17 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from './prisma';
 
+export type CRMUser = {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: string;
+};
+
+export type ProjectAccessResult =
+  | { granted: true; user: CRMUser; projectRole: string }
+  | { granted: false; reason: 'UNAUTHENTICATED' | 'FORBIDDEN' };
+
 export async function getSession() {
   if (process.env.CRM_TEST_MODE === 'true') {
     return {
@@ -19,24 +30,24 @@ export async function getSession() {
 // Garante que o usuário logado é SUPERADMIN
 export async function requireSuperadmin() {
   const session = await getSession();
-  if (!session || !session.user || (session.user as any).role !== 'SUPERADMIN') {
+  if (!session || !session.user || (session.user as CRMUser).role !== 'SUPERADMIN') {
     throw new Error('Acesso negado: Requer privilégios de Superadmin.');
   }
-  return session.user as { id: string; email: string; name?: string; role: string };
+  return session.user as CRMUser;
 }
 
-// Garante que o usuário logado tem acesso ao projeto e valida o papel (se exigido)
-export async function requireProjectAccess(projectId: string, requiredRole?: 'PROJECT_ADMIN' | 'MEMBER') {
+// Resolve o acesso sem lançar exceção para que páginas possam renderizar um estado esperado.
+export async function resolveProjectAccess(projectId: string): Promise<ProjectAccessResult> {
   const session = await getSession();
   if (!session || !session.user) {
-    throw new Error('Acesso negado: Não autenticado.');
+    return { granted: false, reason: 'UNAUTHENTICATED' };
   }
 
-  const user = session.user as { id: string; email: string; name?: string; role: string };
+  const user = session.user as CRMUser;
 
   // Superadmin tem passe livre global
   if (user.role === 'SUPERADMIN') {
-    return { user, projectRole: 'PROJECT_ADMIN' };
+    return { granted: true, user, projectRole: 'PROJECT_ADMIN' };
   }
 
   // Verifica se o usuário tem membership no projeto
@@ -50,13 +61,25 @@ export async function requireProjectAccess(projectId: string, requiredRole?: 'PR
   });
 
   if (!membership) {
-    throw new Error('Acesso negado: Você não tem permissão neste projeto.');
+    return { granted: false, reason: 'FORBIDDEN' };
+  }
+
+  return { granted: true, user, projectRole: membership.role };
+}
+
+// Garante acesso em Server Actions. Páginas e layouts devem usar resolveProjectAccess.
+export async function requireProjectAccess(projectId: string, requiredRole?: 'PROJECT_ADMIN' | 'MEMBER') {
+  const access = await resolveProjectAccess(projectId);
+  if (!access.granted) {
+    throw new Error(access.reason === 'UNAUTHENTICATED'
+      ? 'Acesso negado: Não autenticado.'
+      : 'Acesso negado: Você não tem permissão neste projeto.');
   }
 
   // Se for exigido papel específico (ex: PROJECT_ADMIN), valida
-  if (requiredRole && requiredRole === 'PROJECT_ADMIN' && membership.role !== 'PROJECT_ADMIN') {
+  if (requiredRole === 'PROJECT_ADMIN' && access.projectRole !== 'PROJECT_ADMIN') {
     throw new Error('Acesso negado: Apenas administradores do projeto podem realizar esta ação.');
   }
 
-  return { user, projectRole: membership.role };
+  return { user: access.user, projectRole: access.projectRole };
 }

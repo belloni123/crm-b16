@@ -7,7 +7,7 @@ export default withAuth(
     const path = req.nextUrl.pathname;
 
     if (path.startsWith('/admin') && token?.role !== 'SUPERADMIN') {
-      return NextResponse.redirect(new URL('/?error=AccessDenied', req.url));
+      return NextResponse.redirect(new URL('/acesso-negado?reason=admin', req.url));
     }
 
     return NextResponse.next();
