@@ -3,8 +3,18 @@ const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
+function requireSeedEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`Defina ${name} explicitamente antes de executar o seed.`);
+  return value;
+}
+
 async function main() {
-  console.log('Iniciando seed do banco de dados (com melhorias do adendo)...');
+  if (process.env.ALLOW_DESTRUCTIVE_SEED !== 'true') {
+    throw new Error('Seed bloqueado. Use ALLOW_DESTRUCTIVE_SEED=true somente em um banco local descartável.');
+  }
+
+  console.log('Iniciando seed local...');
 
   // Verificar se já existe algum usuário no banco
   const userCount = await prisma.user.count();
@@ -36,40 +46,40 @@ async function main() {
   console.log('Tabelas limpas com sucesso.');
 
   // 2. Criar Usuários
-  const passwordHash = await bcrypt.hash('admin123', 10);
+  const passwordHash = await bcrypt.hash(requireSeedEnv('SEED_SUPERADMIN_PASSWORD'), 10);
   const superadmin = await prisma.user.create({
     data: {
-      name: 'Felipe Belloni',
-      email: 'admin@crmb16.com.br',
+      name: process.env.SEED_SUPERADMIN_NAME?.trim() || 'Administrador local',
+      email: requireSeedEnv('SEED_SUPERADMIN_EMAIL'),
       passwordHash,
       role: 'SUPERADMIN',
     },
   });
 
-  const rootPasswordHash = await bcrypt.hash('Fkbs1990@!34821', 10);
+  const rootPasswordHash = await bcrypt.hash(requireSeedEnv('SEED_SECOND_ADMIN_PASSWORD'), 10);
   const rootUser = await prisma.user.create({
     data: {
-      name: 'Felipe Agência B16',
-      email: 'felipe@agenciab16.com.br',
+      name: process.env.SEED_SECOND_ADMIN_NAME?.trim() || 'Segundo administrador local',
+      email: requireSeedEnv('SEED_SECOND_ADMIN_EMAIL'),
       passwordHash: rootPasswordHash,
       role: 'SUPERADMIN',
     },
   });
 
-  const memberPasswordHash = await bcrypt.hash('membro123', 10);
+  const memberPasswordHash = await bcrypt.hash(requireSeedEnv('SEED_MEMBER_PASSWORD'), 10);
   const memberUser = await prisma.user.create({
     data: {
-      name: 'Consultor CRM B16',
-      email: 'membro@crmb16.com.br',
+      name: process.env.SEED_MEMBER_NAME?.trim() || 'Membro local',
+      email: requireSeedEnv('SEED_MEMBER_EMAIL'),
       passwordHash: memberPasswordHash,
       role: 'USER',
     },
   });
 
   console.log(`Usuários criados:
-  - Superadmin: ${superadmin.email} (senha: admin123)
-  - Root Principal: ${rootUser.email} (senha: Fkbs1990@134821)
-  - Membro: ${memberUser.email} (senha: membro123)`);
+  - Superadmin: ${superadmin.email}
+  - Segundo administrador: ${rootUser.email}
+  - Membro: ${memberUser.email}`);
 
   // 3. Criar Projetos
   const project1 = await prisma.project.create({

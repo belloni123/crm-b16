@@ -4,8 +4,15 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = 'felipe@agenciab16.com.br';
-  const password = 'Fkbs1990@134821';
+  if (process.env.ALLOW_ROOT_USER_UPDATE !== 'true') {
+    throw new Error('Operação bloqueada. Defina ALLOW_ROOT_USER_UPDATE=true explicitamente.');
+  }
+
+  const email = process.env.ROOT_USER_EMAIL?.trim();
+  const password = process.env.ROOT_USER_PASSWORD;
+  if (!email || !password || password.length < 12) {
+    throw new Error('Defina ROOT_USER_EMAIL e ROOT_USER_PASSWORD com pelo menos 12 caracteres.');
+  }
   
   console.log(`Verificando se o usuário raiz "${email}" existe...`);
   
@@ -29,7 +36,7 @@ async function main() {
     console.log('Criando novo usuário raiz com acesso SUPERADMIN...');
     await prisma.user.create({
       data: {
-        name: 'Felipe Belloni',
+        name: process.env.ROOT_USER_NAME?.trim() || 'Administrador',
         email,
         passwordHash,
         role: 'SUPERADMIN',

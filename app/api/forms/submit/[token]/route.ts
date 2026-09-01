@@ -278,7 +278,8 @@ export async function POST(
   for (const field of form.fields) {
     if (field.type === 'CUSTOM' && (!field.customFieldDefinition?.isActive || field.customFieldDefinition.deletedAt)) continue;
     if (field.required) {
-      const val = body[field.fieldName];
+      const val = body[field.fieldName]
+        ?? (field.type === 'CUSTOM' ? field.customFieldDefinition?.defaultValue : undefined);
       if (val === undefined || val === null || val.toString().trim() === '') {
         missingFields.push(field.label);
       }
@@ -300,7 +301,9 @@ export async function POST(
   const customFieldValues: { definitionId: string; value: string }[] = [];
 
   for (const field of form.fields) {
-    const val = body[field.fieldName]?.toString().trim();
+    const submittedValue = body[field.fieldName]
+      ?? (field.type === 'CUSTOM' ? field.customFieldDefinition?.defaultValue : undefined);
+    const val = submittedValue?.toString().trim();
     if (field.type === 'SYSTEM') {
       if (field.fieldName === 'name' && val) {
         leadName = val;

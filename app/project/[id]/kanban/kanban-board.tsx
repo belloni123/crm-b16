@@ -209,7 +209,7 @@ export function KanbanBoard({
       
       const fieldValues: Record<string, string> = {};
       fields.forEach(f => {
-        fieldValues[f.id] = f.value;
+        fieldValues[f.id] = f.value || f.defaultValue || '';
       });
       setEditingCustomFields(fieldValues);
 

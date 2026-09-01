@@ -19,12 +19,12 @@ O backup no mesmo volume protege contra erro lógico, mas não contra perda do s
 
 ## Baseline e deploy
 
-Como as duas migrations antigas já estão materializadas no schema de produção, elas devem ser marcadas como aplicadas com `prisma migrate resolve --applied` antes de publicar a imagem cujo boot usa `prisma migrate deploy`. Isso registra metadados, sem executar o SQL antigo novamente. Depois, somente a migration nova é executada.
+Como as duas migrations antigas já estavam materializadas no schema de produção, elas foram marcadas como aplicadas com `prisma migrate resolve --applied` antes da publicação da imagem cujo boot usa `prisma migrate deploy`. A operação registrou apenas os metadados de `20260606000000_init` e `20260606100000_add_crm_enhancements`, sem executar novamente o SQL antigo. O status foi conferido como atualizado; no deploy, somente a migration nova deve executar.
 
 O container não executa mais seed nem `db push` no boot. O fluxo passa a ser:
 
 1. backup validado;
-2. baseline das migrations históricas;
+2. baseline das migrations históricas, já concluído em 2026-09-01;
 3. `prisma migrate deploy`;
 4. start da aplicação;
 5. healthcheck `/api/health`;

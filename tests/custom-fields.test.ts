@@ -33,3 +33,10 @@ test('aplica regras de tamanho, expressão regular e e-mail', () => {
   assert.throws(() => normalizeCustomFieldValue('TEXT', 'b16', [], rules), /validação/);
   assert.throws(() => normalizeCustomFieldValue('EMAIL', 'invalido'), /e-mail válido/);
 });
+
+test('valida valores padrão com as mesmas regras dos valores informados', () => {
+  assert.equal(normalizeCustomFieldValue('SELECT', 'Ativo', ['Ativo', 'Inativo']), 'Ativo');
+  assert.equal(normalizeCustomFieldValue('NUMBER', '12', [], { min: 10 }), '12');
+  assert.throws(() => normalizeCustomFieldValue('SELECT', 'Arquivado', ['Ativo']), /opção válida/);
+  assert.throws(() => normalizeCustomFieldValue('NUMBER', '5', [], { min: 10 }), /mínimo/);
+});

@@ -240,7 +240,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
       
       const fieldValues: Record<string, string> = {};
       fields.forEach(f => {
-        fieldValues[f.id] = f.value;
+        fieldValues[f.id] = f.value || f.defaultValue || '';
       });
       setEditingCustomFields(fieldValues);
 

@@ -16,6 +16,7 @@ import { getPhoneVariants } from '@/lib/utils';
 import bcrypt from 'bcryptjs';
 import { sendPasswordResetEmail } from '@/lib/mail';
 import { syncTaskToAllCalendars } from '@/lib/calendar';
+import { assertExactOrder } from '@/lib/order';
 import {
   CUSTOM_FIELD_TYPES,
   type CustomFieldType,
@@ -158,12 +159,7 @@ export async function reorderStages(projectId: string, pipelineId: string, order
     where: { pipelineId, pipeline: { projectId } },
     select: { id: true },
   });
-  const currentIds = new Set(stages.map((stage) => stage.id));
-  const uniqueIds = new Set(orderedStageIds);
-
-  if (orderedStageIds.length !== stages.length || uniqueIds.size !== stages.length || orderedStageIds.some((id) => !currentIds.has(id))) {
-    throw new Error('A nova ordem precisa conter exatamente todas as etapas deste Kanban.');
-  }
+  assertExactOrder(stages.map((stage) => stage.id), orderedStageIds, 'estágios deste Kanban');
 
   await prisma.$transaction(
     orderedStageIds.map((id, order) => prisma.stage.update({ where: { id }, data: { order } })),
@@ -378,6 +374,7 @@ export async function createCustomFieldDefinition(
   if (!CUSTOM_FIELD_TYPES.includes(data.type)) throw new Error('Tipo de campo inválido.');
 
   const options = parseFieldOptions(data.options);
+  const rules = parseValidationRules(data.validationRules);
   if (['SELECT', 'MULTI_SELECT'].includes(data.type) && options.length === 0) {
     throw new Error('Campos de seleção precisam de pelo menos uma opção.');
   }
@@ -397,8 +394,10 @@ export async function createCustomFieldDefinition(
       type: data.type,
       options: options.length ? JSON.stringify(options) : null,
       helpText: data.helpText?.trim() || null,
-      defaultValue: data.defaultValue || null,
-      validationRules: data.validationRules || null,
+      defaultValue: data.defaultValue
+        ? normalizeCustomFieldValue(data.type, data.defaultValue, options, rules)
+        : null,
+      validationRules: Object.keys(rules).length ? JSON.stringify(rules) : null,
       required: Boolean(data.required),
       order: (last?.order ?? -1) + 1,
       projectId,
@@ -446,6 +445,9 @@ export async function updateCustomFieldDefinition(
   if (duplicate) throw new Error('Já existe um campo com este nome interno.');
 
   const options = data.options === undefined ? parseFieldOptions(existing.options) : parseFieldOptions(data.options);
+  const rules = data.validationRules === undefined
+    ? parseValidationRules(existing.validationRules)
+    : parseValidationRules(data.validationRules);
   if (['SELECT', 'MULTI_SELECT'].includes(type) && options.length === 0) {
     throw new Error('Campos de seleção precisam de pelo menos uma opção.');
   }
@@ -458,8 +460,14 @@ export async function updateCustomFieldDefinition(
       type,
       options: options.length ? JSON.stringify(options) : null,
       helpText: data.helpText === undefined ? undefined : data.helpText?.trim() || null,
-      defaultValue: data.defaultValue === undefined ? undefined : data.defaultValue || null,
-      validationRules: data.validationRules === undefined ? undefined : data.validationRules || null,
+      defaultValue: data.defaultValue === undefined
+        ? undefined
+        : data.defaultValue
+          ? normalizeCustomFieldValue(type, data.defaultValue, options, rules)
+          : null,
+      validationRules: data.validationRules === undefined
+        ? undefined
+        : Object.keys(rules).length ? JSON.stringify(rules) : null,
       required: data.required,
       isActive: data.isActive,
     },
@@ -475,10 +483,7 @@ export async function reorderCustomFieldDefinitions(projectId: string, orderedId
     where: { projectId, deletedAt: null },
     select: { id: true },
   });
-  const ids = new Set(definitions.map((definition) => definition.id));
-  if (orderedIds.length !== ids.size || new Set(orderedIds).size !== ids.size || orderedIds.some((id) => !ids.has(id))) {
-    throw new Error('A nova ordem precisa conter exatamente todos os campos deste projeto.');
-  }
+  assertExactOrder(definitions.map((definition) => definition.id), orderedIds, 'campos deste projeto');
   await prisma.$transaction(
     orderedIds.map((id, order) => prisma.customFieldDefinition.update({ where: { id }, data: { order } })),
   );

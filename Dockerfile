@@ -9,7 +9,7 @@ RUN apt-get update -y && apt-get install -y openssl python3 make g++ && rm -rf /
 COPY package.json package-lock.json* ./
 
 # Instala dependências em produção
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 
 # Copia os arquivos de código
 COPY . .

@@ -503,8 +503,10 @@ export function SettingsPanel({
         if (['SELECT', 'MULTI_SELECT'].includes(type)) {
           let options: string[] = [];
           try { options = JSON.parse(definition?.options || '[]'); } catch { options = []; }
+          let defaults: string[] = [];
+          try { defaults = type === 'MULTI_SELECT' ? JSON.parse(definition?.defaultValue || '[]') : [definition?.defaultValue || '']; } catch { defaults = []; }
           const multiple = type === 'MULTI_SELECT' ? ' multiple' : '';
-          const optionHtml = options.map((option) => `      <option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('\n');
+          const optionHtml = options.map((option) => `      <option value="${escapeHtml(option)}"${defaults.includes(option) ? ' selected' : ''}>${escapeHtml(option)}</option>`).join('\n');
           return `  <div class="nfs-field">
     <label class="nfs-label">${label}${requiredAsterisk}</label>
     <select name="${name}" class="nfs-input"${multiple}${requiredAttr}>
@@ -515,13 +517,13 @@ ${optionHtml}
         if (type === 'LONG_TEXT') {
           return `  <div class="nfs-field">
     <label class="nfs-label">${label}${requiredAsterisk}</label>
-    <textarea name="${name}" class="nfs-input"${requiredAttr}></textarea>
+    <textarea name="${name}" class="nfs-input"${requiredAttr}>${escapeHtml(definition?.defaultValue || '')}</textarea>
   </div>`;
         }
         const fieldType = ({ EMAIL: 'email', PHONE: 'tel', NUMBER: 'number', CURRENCY: 'number', DATE: 'date', DATETIME: 'datetime-local', URL: 'url', CHECKBOX: 'checkbox', BOOLEAN: 'checkbox' } as Record<string, string>)[type] || 'text';
         return `  <div class="nfs-field">
     <label class="nfs-label">${label}${requiredAsterisk}</label>
-    <input type="${fieldType}" name="${name}" class="nfs-input"${type === 'CURRENCY' ? ' step="0.01"' : ''}${requiredAttr} />
+    <input type="${fieldType}" name="${name}" class="nfs-input"${type === 'CURRENCY' ? ' step="0.01"' : ''}${['CHECKBOX', 'BOOLEAN'].includes(type) && definition?.defaultValue === 'true' ? ' checked' : ''}${!['CHECKBOX', 'BOOLEAN'].includes(type) && definition?.defaultValue ? ` value="${escapeHtml(definition.defaultValue)}"` : ''}${requiredAttr} />
   </div>`;
       })
       .join('\n\n');
@@ -979,6 +981,7 @@ ${fieldsHtml}
       resetCustomEditor();
     } catch (err) {
       console.error(err);
+      alert(err instanceof Error ? err.message : 'Erro ao salvar o campo personalizado.');
     } finally {
       setIsPending(false);
     }

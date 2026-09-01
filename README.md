@@ -1,100 +1,50 @@
-# CRM b16 — Plataforma de CRM Multiprojeto
+# CRM B16 — plataforma de CRM multiprojeto
 
-Esta é a plataforma de CRM Multiprojeto oficial do **CRM b16**, um clube privado de empresários focados em escala de negócios. A plataforma foi desenvolvida focando em estética premium (dark mode com glassmorphism), isolamento multi-tenant rígido por projeto (`project_id`), webhooks de entrada dinâmicos com mapeamento JSON e caixa de entrada integrada de WhatsApp conectada à Evolution API.
+Aplicação oficial do CRM B16 em Next.js 16, Prisma e PostgreSQL. O produto mantém isolamento por projeto, múltiplos funis, Kanban, leads, tarefas, formulários embutidos, API pública, WhatsApp via Evolution API, campos personalizados tipados e webhooks de entrada e saída.
 
----
+## Documentação técnica
 
-## 🔑 Credenciais de Acesso Padrão (Seed)
+- [Auditoria e matriz funcional](docs/auditoria-crm-e-matriz.md)
+- [Campos personalizados, webhooks e Kanban](docs/campos-webhooks-kanban.md)
+- [Operação, migrations e rollback](docs/operacao-migrations-rollback.md)
+- [Evidências de QA da entrega de 2026-09-01](docs/qa-release-2026-09-01.md)
 
-Após rodar o script de banco de dados, você poderá efetuar login com os seguintes usuários de teste:
+## Desenvolvimento local
 
-*   **Superadmin (Acesso Global):**
-    *   **E-mail:** `admin@crmb16.com.br`
-    *   **Senha:** `admin123`
-*   **Membro de Teste (Acesso ao Projeto 1):**
-    *   **E-mail:** `membro@crmb16.com.br`
-    *   **Senha:** `membro123`
+Requisitos: Node.js 20+, npm e PostgreSQL 15+. Não existem credenciais padrão documentadas e o seed nunca deve ser executado em produção.
 
----
-
-## 🛠️ Como Rodar Localmente (Desenvolvimento com PostgreSQL)
-
-Para garantir 100% de consistência com a produção, a plataforma roda exclusivamente com **PostgreSQL** tanto localmente quanto no deploy de produção. O schema do Prisma é fixo para PostgreSQL.
-
-Você pode rodar o PostgreSQL local de duas maneiras: via **Docker** ou nativamente via **Homebrew** no macOS.
-
-### Opção A: Rodar via Docker (Recomendado se tiver Docker instalado)
-1. **Suba apenas o serviço do PostgreSQL no Docker:**
-   ```bash
-   docker-compose up -d postgres
-   ```
-2. **Sincronize as tabelas do banco de dados:**
-   ```bash
-   npx prisma db push
-   ```
-3. **Povoar o banco com os dados iniciais (Seed):**
-   ```bash
-   node prisma/seed.js
-   ```
-4. **Inicie o servidor de desenvolvimento:**
-   ```bash
-   npm run dev
-   ```
-
-### Opção B: Rodar nativamente via Homebrew (Para rodar sem Docker)
-1. **Inicie o serviço do PostgreSQL 15:**
-   ```bash
-   brew services start postgresql@15
-   ```
-2. **Crie o usuário administrador do banco de dados do CRM:**
-   ```bash
-   createuser -s crm_user
-   ```
-3. **Crie o banco de dados oficial:**
-   ```bash
-   createdb -O crm_user crm_b16
-   ```
-4. **Defina a senha do usuário do banco (deve corresponder ao .env):**
-   ```bash
-   psql -d postgres -c "ALTER USER crm_user WITH PASSWORD 'crm_password_secure_123';"
-   ```
-5. **Sincronize as tabelas e rode o seed:**
-   ```bash
-   npx prisma db push
-   node prisma/seed.js
-   ```
-6. **Inicie o servidor de desenvolvimento:**
-   ```bash
-   npm run dev
-   ```
-
-5. **Acesse o painel:**
-   Abra [http://localhost:3000](http://localhost:3000) (ou a porta exibida no terminal) no seu navegador.
-
----
-
-## 🐳 Configurações e Deploy no Coolify (Produção)
-
-O projeto já está 100% pronto para deploy na sua VPS via Coolify, configurado com Dockerfile multiphase otimizado para Next.js e docker-compose contendo PostgreSQL.
-
-No Coolify, crie um novo recurso de **Docker Compose** apontando para o seu repositório e configure as variáveis de ambiente necessárias.
-
-### Variáveis de Ambiente (`.env`):
-
-Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
-
-```env
-# Banco de Dados (PostgreSQL para Produção no Coolify)
-DATABASE_URL="postgresql://postgres:sua_senha_segura@postgres:5432/crm_b16?schema=public"
-
-# Configurações do NextAuth
-NEXTAUTH_URL="http://localhost:3000" # Em produção, altere para https://seu-dominio.com
-NEXTAUTH_SECRET="um_hash_md5_ou_string_aleatoria_longa_e_segura"
-
-# Integração Evolution API (WhatsApp)
-EVOLUTION_API_URL="https://sua-evolution-api.com"
-EVOLUTION_API_KEY="seu_apikey_global_da_evolution_api"
+```bash
+cp .env.example .env
+npm ci --legacy-peer-deps
+npx prisma migrate deploy
+npm run dev
 ```
+
+Para subir o banco pelo Compose, configure primeiro as variáveis obrigatórias do `.env` e execute `docker compose up -d postgres`. Se o Next.js rodar fora do Docker, ajuste o host do `DATABASE_URL` de `postgres` para `localhost`.
+
+Antes de enviar uma alteração:
+
+```bash
+npm test
+npm run lint
+npx prisma validate
+npm run build
+npm audit --omit=dev
+```
+
+## Produção no Coolify
+
+O recurso de produção usa `docker-compose.yml`. O boot executa somente migrations versionadas com `prisma migrate deploy`, inicia o Next.js e expõe o healthcheck em `/api/health`. Não use `prisma db push`, seed, reset ou recriação de volume em produção.
+
+Variáveis obrigatórias:
+
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` e `DATABASE_URL`;
+- `NEXTAUTH_URL` e `NEXTAUTH_SECRET`;
+- `WEBHOOK_ENCRYPTION_KEY`, usada para criptografar headers de webhooks de saída.
+
+Integrações opcionais usam `EVOLUTION_*`, `RESEND_API_KEY`, `MAIL_FROM`, `SMTP_*`, `GOOGLE_*` e `MICROSOFT_*`. Gere segredos longos e aleatórios no gerenciador de variáveis do Coolify; nunca grave valores reais no Git.
+
+O procedimento completo de backup, baseline, migração, verificação e rollback está em [docs/operacao-migrations-rollback.md](docs/operacao-migrations-rollback.md).
 
 ---
 
@@ -310,7 +260,6 @@ Adicionamos aprimoramentos estéticos modernos e um sistema completo de redefini
 *   **Transição de Card**: Na tela de login, clicando em "Esqueci minha senha", a caixa de login realiza uma transição suave para o formulário de e-mail de recuperação.
 *   **Simulador de E-mail de Desenvolvimento**: Como não há SMTP ativo localmente, a tela de sucesso exibe uma caixa destacada contendo o link de depuração para testes locais: `http://localhost:3000/reset-password?token=...`.
 *   **Página Pública de Redefinição (`/reset-password`)**: Rota segura que extrai o token da URL, valida a expiração de 1 hora no PostgreSQL, valida a força da senha (mínimo de 6 caracteres), gera o hash `bcryptjs` no servidor e atualiza o usuário no banco de dados.
-
 
 
 
