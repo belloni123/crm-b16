@@ -9,9 +9,7 @@ import {
   Webhook, 
   UploadCloud, 
   Users2, 
-  CheckCircle2, 
   ArrowRight, 
-  ExternalLink, 
   Copy, 
   Check, 
   HelpCircle, 
@@ -100,8 +98,8 @@ export function HelpContent({ projectId, projectRole, markdown }: HelpContentPro
     },
     {
       id: 'webhook',
-      title: '2. Configurar Webhook',
-      subtitle: 'Capturar leads externos de WordPress, Elementor, Kiwify, Hotmart, etc.',
+      title: '2. Configurar Webhooks',
+      subtitle: 'Receber leads externos ou enviar eventos do CRM com campos configuráveis.',
       icon: <Webhook className="h-5 w-5" />,
       link: {
         href: `/project/${projectId}/settings?tab=webhooks`,
@@ -110,7 +108,7 @@ export function HelpContent({ projectId, projectRole, markdown }: HelpContentPro
       },
       steps: [
         {
-          text: 'No menu de Configurações, selecione a aba Webhooks de Entrada.',
+          text: 'No menu de Configurações, selecione a aba Webhooks e escolha Entrada para receber leads ou Saída para enviar eventos.',
         },
         {
           text: 'No campo Nome da Integração, dê um nome descritivo para identificar a origem dos leads.',
@@ -125,11 +123,14 @@ export function HelpContent({ projectId, projectRole, markdown }: HelpContentPro
           example: 'WordPress'
         },
         {
-          text: 'Na seção Mapeamento de Campos, digite o nome exato dos campos JSON enviados pela sua plataforma externa nos inputs correspondentes (Nome do Lead, E-mail, Telefone).',
-          example: 'nome, email, whatsapp'
+          text: 'Em Campos recebidos, adicione qualquer campo padrão ou personalizado e informe o caminho exato em que o valor chega no JSON.',
+          example: 'data.contact.email'
         },
         {
-          text: 'Clique em Adicionar.',
+          text: 'Se o dado ainda não possuir destino no CRM, clique em Criar campo personalizado. O campo será criado e incluído no webhook sem sair da tela.',
+        },
+        {
+          text: 'Marque os campos obrigatórios, ajuste a ordem e clique em Criar webhook.',
         },
         {
           text: 'Na listagem de Webhooks abaixo, localize a integração criada e clique em Copiar Link.',

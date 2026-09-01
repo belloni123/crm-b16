@@ -2,6 +2,31 @@
 
 Este relatório evita dados pessoais, tokens e credenciais. A linha de base foi coletada somente como contagens e verificações de integridade.
 
+## Correção funcional — construtor de webhooks de entrada
+
+Depois da primeira publicação, a configuração de entrada ainda expunha apenas os cinco destinos fixos da interface antiga. A correção substitui essa tela por um construtor dinâmico, sem alterar os tokens existentes:
+
+- separação explícita entre webhooks de **Entrada** e **Saída**;
+- até 50 mapeamentos ordenáveis por endpoint;
+- 13 campos padrão de lead, incluindo prioridade, UTMs, referência e página de entrada;
+- qualquer campo personalizado ativo como destino;
+- criação de campo personalizado sem sair da configuração do webhook, com 13 tipos disponíveis;
+- caminho JSON aninhado, obrigatoriedade por campo, prévia do mapeamento e validação contra destinos duplicados ou caminhos perigosos;
+- conversão automática do formato legado para a versão 2 somente ao editar, preservando URL e token.
+
+### Evidências da correção antes do deploy
+
+| Verificação | Resultado |
+|---|---|
+| Testes automatizados | 16/16 aprovados |
+| Casos novos | conversão legada, extração dinâmica, obrigatoriedade, duplicidade e bloqueio de prototype pollution |
+| Compatibilidade com produção | 10/10 webhooks de entrada legados compatíveis; 0 incompatíveis |
+| TypeScript | Aprovado com `tsc --noEmit` |
+| ESLint | 0 erros; 42 avisos não bloqueantes fora da implementação nova |
+| Auditoria de dependências de produção | 0 vulnerabilidades conhecidas |
+| Whitespace/patch | `git diff --check` aprovado |
+| Alteração de banco | Nenhuma migration; o mapeamento versionado usa a coluna já existente |
+
 ## Escopo
 
 - evolução segura de campos personalizados;

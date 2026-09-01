@@ -52,9 +52,9 @@ O procedimento completo de backup, baseline, migração, verificação e rollbac
 
 A plataforma suporta o recebimento de leads de qualquer ferramenta externa (ex: Kiwify, WordPress, Elementor, Hotmart) de forma dinâmica.
 
-1.  Crie um webhook em **Configurações > Webhooks de Entrada** dentro do projeto.
+1.  Abra **Configurações > Webhooks**, escolha **Entrada** e clique em **Novo webhook**.
 2.  O sistema gerará uma URL exclusiva: `https://seu-dominio.com/api/webhooks/incoming/[token]`.
-3.  Configure o **Mapeamento de Campos** usando a notação de ponto para objetos JSON aninhados.
+3.  Em **Campos recebidos**, adicione, remova ou reordene qualquer campo. Escolha o destino no CRM e configure o caminho usando a notação de ponto para objetos JSON aninhados. Se o destino ainda não existir, use **Criar campo personalizado** sem sair da tela.
     *   *Exemplo de Payload Recebido:*
         ```json
         {
@@ -68,12 +68,12 @@ A plataforma suporta o recebimento de leads de qualquer ferramenta externa (ex: 
           }
         }
         ```
-    *   *Mapeamento no CRM:*
+    *   *Mapeamento no construtor:*
         *   **Nome:** `cliente.nome`
         *   **E-mail:** `cliente.email`
         *   **Telefone:** `cliente.telefone`
         *   **Valor:** `venda.valor`
-4.  O CRM processará o payload automaticamente, criará o lead no estágio selecionado e salvará o log bruto da requisição para auditoria na UI de configurações.
+4.  Campos podem ser marcados como obrigatórios. O CRM valida o payload, cria ou atualiza o lead no estágio selecionado e registra sucesso ou erro no histórico da própria tela.
 
 ---
 
@@ -156,7 +156,7 @@ A plataforma foi projetada para gerenciar múltiplos fluxos comerciais no mesmo 
 * Ao deletar um funil de evento, o sistema executa a exclusão segura em cascata de suas etapas e participações (`PipelineEntry`), mas **preserva os leads cadastrados** (a pessoa física/contato não é excluída).
 
 ### 2. Roteamento Inteligente de Webhooks
-* Ao criar um webhook de integração em **Configurações > Webhooks de Entrada**, o seletor de "Estágio de Destino" exibirá as colunas do CRM agrupadas por seus respectivos Kanbans (ex: `Lançamento Junho > Inscrito`).
+* Ao criar um webhook de integração em **Configurações > Webhooks > Entrada**, o seletor de "Estágio de Destino" exibirá as colunas do CRM agrupadas por seus respectivos Kanbans (ex: `Lançamento Junho > Inscrito`).
 * Isso permite que leads vindos de formulários externos do WordPress ou de compras aprovadas no Kiwify/Hotmart caiam diretamente no Kanban de evento correto de forma totalmente automática.
 
 ### 3. Importação de Leads via CSV
@@ -260,6 +260,5 @@ Adicionamos aprimoramentos estéticos modernos e um sistema completo de redefini
 *   **Transição de Card**: Na tela de login, clicando em "Esqueci minha senha", a caixa de login realiza uma transição suave para o formulário de e-mail de recuperação.
 *   **Simulador de E-mail de Desenvolvimento**: Como não há SMTP ativo localmente, a tela de sucesso exibe uma caixa destacada contendo o link de depuração para testes locais: `http://localhost:3000/reset-password?token=...`.
 *   **Página Pública de Redefinição (`/reset-password`)**: Rota segura que extrai o token da URL, valida a expiração de 1 hora no PostgreSQL, valida a força da senha (mínimo de 6 caracteres), gera o hash `bcryptjs` no servidor e atualiza o usuário no banco de dados.
-
 
 

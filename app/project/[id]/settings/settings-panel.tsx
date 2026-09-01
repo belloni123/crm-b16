@@ -40,6 +40,7 @@ import {
   disconnectCalendarIntegration
 } from '@/app/actions/calendar';
 import { Calendar } from 'lucide-react';
+import { WebhookSettings, type WebhookSettingsCustomField } from './webhook-settings';
 import { 
   Settings, 
   Layers, 
@@ -47,13 +48,11 @@ import {
   Webhook, 
   Compass, 
   Frown, 
-  PlusCircle, 
   Trash2, 
   Plus, 
   QrCode, 
   MessageSquare,
   Link,
-  ChevronRight,
   Clipboard,
   FileText,
   Loader2,
@@ -141,7 +140,7 @@ interface WebhookLog {
   attempt: number;
   durationMs: number | null;
   createdAt: Date;
-  webhook: { name: string };
+  webhook: { name: string; direction: string };
 }
 
 interface WhatsAppInstance {
@@ -1239,7 +1238,7 @@ ${fieldsHtml}
               <TabButton active={activeTab === 'origins'} onClick={() => setActiveTab('origins')} icon={<Compass className="h-4 w-4" />} label="Origens de Leads" />
               <TabButton active={activeTab === 'losses'} onClick={() => setActiveTab('losses')} icon={<Frown className="h-4 w-4" />} label="Motivos de Perda" />
               <TabButton active={activeTab === 'custom'} onClick={() => setActiveTab('custom')} icon={<ListTodo className="h-4 w-4" />} label="Campos Customizados" />
-              <TabButton active={activeTab === 'webhooks'} onClick={() => setActiveTab('webhooks')} icon={<Webhook className="h-4 w-4" />} label="Webhooks de Entrada" />
+              <TabButton active={activeTab === 'webhooks'} onClick={() => setActiveTab('webhooks')} icon={<Webhook className="h-4 w-4" />} label="Webhooks" />
               <TabButton active={activeTab === 'whatsapp'} onClick={() => setActiveTab('whatsapp')} icon={<MessageSquare className="h-4 w-4" />} label="Conexões WhatsApp" />
               <TabButton active={activeTab === 'comerciais'} onClick={() => setActiveTab('comerciais')} icon={<User className="h-4 w-4" />} label="Comerciais e Distribuição" />
               <TabButton active={activeTab === 'api'} onClick={() => setActiveTab('api')} icon={<Key className="h-4 w-4" />} label="Desenvolvedor & API" />
@@ -1745,8 +1744,22 @@ ${fieldsHtml}
           </div>
         )}
 
-        {/* ABA 6: WEBHOOKS DE ENTRADA */}
+        {/* ABA 6: WEBHOOKS */}
         {activeTab === 'webhooks' && (
+          <WebhookSettings
+            projectId={projectId}
+            pipelines={pipelineList}
+            origins={originsList}
+            customFields={customList as WebhookSettingsCustomField[]}
+            onCustomFieldsChange={(fields) => setCustomList(fields as CustomFieldDef[])}
+            onOpenCustomFields={() => setActiveTab('custom')}
+            initialWebhooks={initialWebhooks}
+            initialLogs={webhookLogs}
+          />
+        )}
+
+        {/* Implementação anterior preservada temporariamente para facilitar rollback do componente. */}
+        {false && activeTab === 'webhooks' && (
           <div className="space-y-6">
             <div>
               <h2 className="text-md font-bold text-white font-display mb-1">Webhooks e Integrações</h2>
