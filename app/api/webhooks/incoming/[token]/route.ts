@@ -2,25 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createOrUpdateDeduplicatedLead } from '@/lib/leads';
 import { normalizeCustomFieldValue, parseFieldOptions, parseValidationRules, type CustomFieldType } from '@/lib/custom-fields';
+import {
+  IncomingWebhookPayloadError,
+  extractIncomingWebhookValues,
+  parseIncomingWebhookMapping,
+} from '@/lib/incoming-webhooks';
 import { dispatchLeadWebhooks, serializeWebhookLogPayload } from '@/lib/webhooks';
-
-// Helper recursivo para buscar propriedades aninhadas em objetos (ex: "customer.name" ou "body.customer.name")
-function getNestedValue(obj: any, path: string): any {
-  if (!path) return undefined;
-  
-  // Limpa prefixo "body." se enviado no mapeamento
-  const cleanPath = path.replace(/^body\./, '');
-  const parts = cleanPath.split('.');
-  
-  let current = obj;
-  for (const part of parts) {
-    if (current === null || current === undefined) {
-      return undefined;
-    }
-    current = current[part];
-  }
-  return current;
-}
 
 export async function POST(
   request: NextRequest,
@@ -47,7 +34,7 @@ export async function POST(
   let body: any = {};
   try {
     body = await request.json();
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       { error: 'Corpo da requisição deve ser um JSON válido.' },
       { status: 400 }
@@ -56,15 +43,15 @@ export async function POST(
 
   // Registramos um log de auditoria
   try {
-    // 2. Extrai o mapeamento
-    const mapping = JSON.parse(webhook.fieldMapping || '{}');
+    // 2. Extrai o mapeamento dinâmico. O parser converte automaticamente o formato legado.
+    const mappedFields = parseIncomingWebhookMapping(webhook.fieldMapping);
+    const { system, custom } = extractIncomingWebhookValues(body, mappedFields);
 
-    // Extrai valores do payload de acordo com o mapeamento configurado
-    const rawName = getNestedValue(body, mapping.name);
-    const rawEmail = getNestedValue(body, mapping.email);
-    const rawPhone = getNestedValue(body, mapping.phone);
-    const rawCompany = getNestedValue(body, mapping.company);
-    const rawValue = getNestedValue(body, mapping.value);
+    const rawName = system.name;
+    const rawEmail = system.email;
+    const rawPhone = system.phone;
+    const rawCompany = system.company;
+    const rawValue = system.value;
 
     // Normalizações básicas
     const name = String(rawName || 'Novo Lead Webhook').substring(0, 100);
@@ -82,12 +69,18 @@ export async function POST(
     const company = rawCompany ? String(rawCompany) : null;
     
     let value = 0.0;
-    if (rawValue) {
+    if (rawValue !== undefined && rawValue !== null && rawValue !== '') {
       const parsedValue = parseFloat(String(rawValue).replace(/[^\d.,]/g, '').replace(',', '.'));
-      if (!isNaN(parsedValue)) {
-        value = parsedValue;
-      }
+      if (isNaN(parsedValue)) throw new IncomingWebhookPayloadError('O valor estimado recebido não é numérico.');
+      value = parsedValue;
     }
+
+    const priorityCandidate = String(system.priority || 'MEDIA').trim().toUpperCase();
+    if (!['BAIXA', 'MEDIA', 'ALTA'].includes(priorityCandidate)) {
+      throw new IncomingWebhookPayloadError('A prioridade precisa ser BAIXA, MEDIA ou ALTA.');
+    }
+
+    const optionalText = (input: unknown) => input === undefined || input === null || input === '' ? null : String(input);
 
     // 3. Cria ou atualiza o lead na base de dados de forma deduplicada e distribui comercial
     const lead = await createOrUpdateDeduplicatedLead(
@@ -98,16 +91,21 @@ export async function POST(
         phone,
         company,
         value,
-        priority: 'MEDIA',
+        priority: priorityCandidate as 'BAIXA' | 'MEDIA' | 'ALTA',
         stageId: webhook.targetStageId,
-        originId: webhook.originId
+        originId: webhook.originId,
+        utmSource: optionalText(system.utmSource),
+        utmMedium: optionalText(system.utmMedium),
+        utmCampaign: optionalText(system.utmCampaign),
+        utmContent: optionalText(system.utmContent),
+        utmTerm: optionalText(system.utmTerm),
+        referrer: optionalText(system.referrer),
+        landingPage: optionalText(system.landingPage),
       },
       null // Sem operador autenticado
     );
 
-    const customMappings = mapping.customFields && typeof mapping.customFields === 'object'
-      ? Object.entries(mapping.customFields) as Array<[string, string]>
-      : [];
+    const customMappings = Object.entries(custom);
     if (customMappings.length > 0) {
       const definitions = await prisma.customFieldDefinition.findMany({
         where: {
@@ -125,10 +123,9 @@ export async function POST(
         [definition.internalName, definition],
       ]));
 
-      for (const [identifier, sourcePath] of customMappings) {
+      for (const [identifier, rawValue] of customMappings) {
         const definition = definitionsByIdentifier.get(identifier);
         if (!definition) continue;
-        const rawValue = getNestedValue(body, sourcePath);
         const value = normalizeCustomFieldValue(
           definition.type as CustomFieldType,
           rawValue,
@@ -171,8 +168,10 @@ export async function POST(
       message: 'Lead processado e criado com sucesso.'
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Erro ao processar payload do webhook:', err);
+    const message = err instanceof Error ? err.message : 'Erro de processamento ou inserção no banco de dados.';
+    const isPayloadError = err instanceof IncomingWebhookPayloadError;
 
     // Registra Log de Erro no Banco de Dados para diagnóstico do usuário
     await prisma.webhookLog.create({
@@ -180,13 +179,13 @@ export async function POST(
         webhookId: webhook.id,
         payload: serializeWebhookLogPayload(body),
         status: 'ERROR',
-        errorDetails: err.message || 'Erro de processamento ou inserção no banco de dados.',
+        errorDetails: message,
       },
     });
 
     return NextResponse.json(
-      { error: 'Erro interno ao processar o webhook.' },
-      { status: 500 }
+      { error: isPayloadError ? message : 'Erro interno ao processar o webhook.' },
+      { status: isPayloadError ? 422 : 500 }
     );
   }
 }

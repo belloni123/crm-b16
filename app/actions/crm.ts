@@ -38,6 +38,11 @@ import {
   type WebhookMethod,
   type WebhookPayloadField,
 } from '@/lib/webhooks';
+import {
+  parseIncomingWebhookMapping,
+  serializeIncomingWebhookMapping,
+  type IncomingWebhookField,
+} from '@/lib/incoming-webhooks';
 
 // ==========================================
 // FUNIS E ESTÁGIOS
@@ -1373,6 +1378,8 @@ export async function createWebhookEndpoint(
   }
 ) {
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+  const name = data.name.trim();
+  if (!name) throw new Error('Informe o nome do webhook.');
 
   const stage = await prisma.stage.findFirst({ where: { id: data.targetStageId, pipeline: { projectId } } });
   if (!stage) throw new Error('Selecione uma etapa válida deste projeto.');
@@ -1380,23 +1387,47 @@ export async function createWebhookEndpoint(
     const origin = await prisma.origin.findFirst({ where: { id: data.originId, projectId } });
     if (!origin) throw new Error('Selecione uma origem válida deste projeto.');
   }
+  const incomingFields = parseIncomingWebhookMapping(data.fieldMapping);
+  await validateIncomingWebhookCustomDestinations(projectId, incomingFields);
 
   const token = crypto.randomBytes(32).toString('hex');
 
   const endpoint = await prisma.webhookEndpoint.create({
     data: {
-      name: data.name,
+      name,
       token,
       targetStageId: data.targetStageId,
       originId: data.originId || null,
       projectId,
-      fieldMapping: data.fieldMapping,
+      fieldMapping: serializeIncomingWebhookMapping(incomingFields),
       direction: 'INCOMING',
     },
   });
 
   revalidatePath(`/project/${projectId}/settings`);
   return endpoint;
+}
+
+async function validateIncomingWebhookCustomDestinations(projectId: string, fields: IncomingWebhookField[]) {
+  const destinations = [...new Set(
+    fields
+      .filter((field) => field.destinationType === 'CUSTOM')
+      .map((field) => field.destination),
+  )];
+  if (destinations.length === 0) return;
+  const definitions = await prisma.customFieldDefinition.findMany({
+    where: {
+      projectId,
+      isActive: true,
+      deletedAt: null,
+      OR: [{ id: { in: destinations } }, { internalName: { in: destinations } }],
+    },
+    select: { id: true, internalName: true },
+  });
+  const validDestinations = new Set(definitions.flatMap((definition) => [definition.id, definition.internalName]));
+  if (destinations.some((destination) => !validDestinations.has(destination))) {
+    throw new Error('Um ou mais campos personalizados do webhook não pertencem a este projeto.');
+  }
 }
 
 async function validateWebhookCustomSources(projectId: string, payloadFields: WebhookPayloadField[]) {
@@ -1490,6 +1521,12 @@ export async function updateWebhookEndpoint(
   }
   if (data.payloadFields) validatePayloadFields(data.payloadFields);
   if (data.payloadFields) await validateWebhookCustomSources(projectId, data.payloadFields);
+  let incomingFieldMapping = data.fieldMapping;
+  if (webhook.direction === 'INCOMING' && data.fieldMapping !== undefined) {
+    const incomingFields = parseIncomingWebhookMapping(data.fieldMapping);
+    await validateIncomingWebhookCustomDestinations(projectId, incomingFields);
+    incomingFieldMapping = serializeIncomingWebhookMapping(incomingFields);
+  }
   const url = data.url === undefined ? undefined : await assertSafeWebhookUrl(data.url);
 
   if (webhook.direction === 'INCOMING' && data.targetStageId !== undefined && data.targetStageId !== null) {
@@ -1508,7 +1545,7 @@ export async function updateWebhookEndpoint(
       isActive: data.isActive,
       targetStageId: data.targetStageId,
       originId: data.originId,
-      fieldMapping: data.fieldMapping,
+      fieldMapping: incomingFieldMapping,
       url,
       method: data.method,
       events: data.events ? JSON.stringify([...new Set(data.events)]) : undefined,
@@ -1586,7 +1623,7 @@ export async function getWebhookLogs(projectId: string) {
     take: 100,
     include: {
       webhook: {
-        select: { name: true },
+        select: { name: true, direction: true },
       },
     },
   });
