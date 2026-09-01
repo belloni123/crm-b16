@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { 
   createStage, 
   deleteStage,
+  reorderStages,
   createTag,
   deleteTag,
   createOrigin,
@@ -11,8 +12,14 @@ import {
   createLostStatus,
   deleteLostStatus,
   createCustomFieldDefinition,
+  updateCustomFieldDefinition,
+  reorderCustomFieldDefinitions,
   deleteCustomFieldDefinition,
   createWebhookEndpoint,
+  createOutgoingWebhook,
+  updateWebhookEndpoint,
+  testOutgoingWebhook,
+  retryWebhookDelivery,
   deleteWebhookEndpoint,
   updateProjectCommercials,
   generateProjectApiKey,
@@ -56,7 +63,10 @@ import {
   Key,
   Copy,
   Check,
-  Palette
+  Palette,
+  GripVertical,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 interface Stage {
@@ -91,15 +101,29 @@ interface LostStatus {
 interface CustomFieldDef {
   id: string;
   name: string;
+  internalName: string;
   type: string;
   options: string | null;
+  helpText: string | null;
+  defaultValue: string | null;
+  validationRules: string | null;
+  required: boolean;
+  isActive: boolean;
+  order: number;
 }
 
 interface WebhookEndpoint {
   id: string;
   name: string;
   token: string;
-  targetStageId: string;
+  direction: string;
+  url: string | null;
+  method: string;
+  isActive: boolean;
+  events: string;
+  payloadFields: string;
+  timeoutMs: number;
+  targetStageId: string | null;
   originId: string | null;
   origin?: { name: string } | null;
   fieldMapping: string;
@@ -111,6 +135,11 @@ interface WebhookLog {
   payload: string;
   status: string;
   errorDetails: string | null;
+  event: string | null;
+  statusCode: number | null;
+  responseBody: string | null;
+  attempt: number;
+  durationMs: number | null;
   createdAt: Date;
   webhook: { name: string };
 }
@@ -265,6 +294,8 @@ export function SettingsPanel({
   const [isEditingPipelineName, setIsEditingPipelineName] = useState(false);
 
   const [stages, setStages] = useState<Stage[]>(selectedPipeline?.stages || []);
+  const [draggedStageId, setDraggedStageId] = useState<string | null>(null);
+  const [stageOrderMessage, setStageOrderMessage] = useState('');
 
   React.useEffect(() => {
     setStages(selectedPipeline?.stages || []);
@@ -364,14 +395,14 @@ export function SettingsPanel({
     } else if (fieldToAdd === 'phone') {
       newField = { type: 'SYSTEM', fieldName: 'phone', customFieldDefinitionId: null, label: 'WhatsApp / Telefone', required: false, order: formFields.length };
     } else {
-      const customDef = initialCustomFieldDefs.find(d => d.id === fieldToAdd);
+      const customDef = customList.find(d => d.id === fieldToAdd && d.isActive);
       if (!customDef) return;
       newField = {
         type: 'CUSTOM',
         fieldName: customDef.id,
         customFieldDefinitionId: customDef.id,
         label: customDef.name,
-        required: false,
+        required: customDef.required,
         order: formFields.length
       };
     }
@@ -456,14 +487,41 @@ export function SettingsPanel({
   };
 
   const getEmbedCode = (form: Form) => {
+    const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    })[character] || character);
     const fieldsHtml = form.fields
       .map(f => {
-        const fieldType = f.fieldName === 'email' ? 'email' : 'text';
+        const definition = f.customFieldDefinitionId
+          ? customList.find((field) => field.id === f.customFieldDefinitionId)
+          : null;
+        const type = definition?.type || (f.fieldName === 'email' ? 'EMAIL' : f.fieldName === 'phone' ? 'PHONE' : 'TEXT');
         const requiredAttr = f.required ? ' required' : '';
         const requiredAsterisk = f.required ? ' *' : '';
+        const label = escapeHtml(f.label);
+        const name = escapeHtml(f.fieldName);
+        if (['SELECT', 'MULTI_SELECT'].includes(type)) {
+          let options: string[] = [];
+          try { options = JSON.parse(definition?.options || '[]'); } catch { options = []; }
+          const multiple = type === 'MULTI_SELECT' ? ' multiple' : '';
+          const optionHtml = options.map((option) => `      <option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('\n');
+          return `  <div class="nfs-field">
+    <label class="nfs-label">${label}${requiredAsterisk}</label>
+    <select name="${name}" class="nfs-input"${multiple}${requiredAttr}>
+${optionHtml}
+    </select>
+  </div>`;
+        }
+        if (type === 'LONG_TEXT') {
+          return `  <div class="nfs-field">
+    <label class="nfs-label">${label}${requiredAsterisk}</label>
+    <textarea name="${name}" class="nfs-input"${requiredAttr}></textarea>
+  </div>`;
+        }
+        const fieldType = ({ EMAIL: 'email', PHONE: 'tel', NUMBER: 'number', CURRENCY: 'number', DATE: 'date', DATETIME: 'datetime-local', URL: 'url', CHECKBOX: 'checkbox', BOOLEAN: 'checkbox' } as Record<string, string>)[type] || 'text';
         return `  <div class="nfs-field">
-    <label class="nfs-label">${f.label}${requiredAsterisk}</label>
-    <input type="${fieldType}" name="${f.fieldName}" class="nfs-input"${requiredAttr} />
+    <label class="nfs-label">${label}${requiredAsterisk}</label>
+    <input type="${fieldType}" name="${name}" class="nfs-input"${type === 'CURRENCY' ? ' step="0.01"' : ''}${requiredAttr} />
   </div>`;
       })
       .join('\n\n');
@@ -472,7 +530,7 @@ export function SettingsPanel({
 <form action="${baseUrl}/api/forms/submit/${form.token}" method="POST" class="nfs-form">
   <!-- Honeypot protection field against spam bots -->
   <div style="display: none !important;">
-    <input type="text" name="nfs_hp_website" tabindex="-1" autocomplete="off" />
+    <input type="text" name="b16_hp_website" tabindex="-1" autocomplete="off" />
   </div>
 
   <!-- Hidden tracking fields for campaigns (UTMs) -->
@@ -572,11 +630,21 @@ ${fieldsHtml}
 
   // Form de Campo Personalizado
   const [newFieldName, setNewFieldName] = useState('');
-  const [newFieldType, setNewFieldType] = useState<'TEXT' | 'NUMBER' | 'SELECT'>('TEXT');
+  const [newFieldInternalName, setNewFieldInternalName] = useState('');
+  const [newFieldType, setNewFieldType] = useState('TEXT');
   const [newFieldOptions, setNewFieldOptions] = useState(''); // Opções separadas por vírgula
+  const [newFieldHelpText, setNewFieldHelpText] = useState('');
+  const [newFieldDefaultValue, setNewFieldDefaultValue] = useState('');
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
+  const [newFieldMin, setNewFieldMin] = useState('');
+  const [newFieldMax, setNewFieldMax] = useState('');
+  const [newFieldPattern, setNewFieldPattern] = useState('');
+  const [editingCustomId, setEditingCustomId] = useState<string | null>(null);
 
   // Form de Webhook
   const [newWebhookName, setNewWebhookName] = useState('');
+  const [newWebhookDirection, setNewWebhookDirection] = useState<'INCOMING' | 'OUTGOING'>('INCOMING');
+  const [editingWebhookId, setEditingWebhookId] = useState<string | null>(null);
   const [newWebhookStageId, setNewWebhookStageId] = useState(stages[0]?.id || '');
   const [newWebhookOriginId, setNewWebhookOriginId] = useState('');
   const [mappingName, setMappingName] = useState('name');
@@ -584,6 +652,24 @@ ${fieldsHtml}
   const [mappingPhone, setMappingPhone] = useState('phone');
   const [mappingCompany, setMappingCompany] = useState('company');
   const [mappingValue, setMappingValue] = useState('value');
+  const [customWebhookMappings, setCustomWebhookMappings] = useState<Record<string, string>>({});
+  const [outgoingWebhookUrl, setOutgoingWebhookUrl] = useState('');
+  const [outgoingWebhookMethod, setOutgoingWebhookMethod] = useState<'POST' | 'PUT' | 'PATCH'>('POST');
+  const [outgoingWebhookEvents, setOutgoingWebhookEvents] = useState<string[]>(['lead.created']);
+  const [outgoingWebhookHeaders, setOutgoingWebhookHeaders] = useState('');
+  const [outgoingWebhookTimeout, setOutgoingWebhookTimeout] = useState('10000');
+  const [outgoingPayloadFields, setOutgoingPayloadFields] = useState<Array<{
+    key: string;
+    sourceType: 'FIELD' | 'CUSTOM' | 'STATIC';
+    source?: string;
+    staticValue?: string;
+    required?: boolean;
+  }>>([
+    { key: 'id', sourceType: 'FIELD', source: 'id', required: true },
+    { key: 'name', sourceType: 'FIELD', source: 'name', required: true },
+    { key: 'email', sourceType: 'FIELD', source: 'email' },
+    { key: 'phone', sourceType: 'FIELD', source: 'phone' },
+  ]);
 
   // Form de WhatsApp
   const [newWhatsappName, setNewWhatsappName] = useState('');
@@ -662,6 +748,9 @@ ${fieldsHtml}
         order: stages.length
       });
       setStages([...stages, created]);
+      setPipelineList(pipelineList.map((pipeline) => pipeline.id === selectedPipeline.id
+        ? { ...pipeline, stages: [...stages, created] }
+        : pipeline));
       setNewStageName('');
     } catch (err) {
       console.error(err);
@@ -671,16 +760,62 @@ ${fieldsHtml}
   };
 
   const handleDeleteStage = async (stageId: string) => {
-    if (!confirm('Deseja excluir este estágio comercial? Leads neste estágio serão excluídos.')) return;
+    if (!confirm('Deseja excluir este estágio comercial? Os leads serão preservados, mas deixarão de participar deste funil.')) return;
     setIsPending(true);
     try {
       await deleteStage(projectId, stageId);
       setStages(stages.filter(s => s.id !== stageId));
+      setPipelineList(pipelineList.map((pipeline) => pipeline.id === selectedPipeline?.id
+        ? { ...pipeline, stages: stages.filter((stage) => stage.id !== stageId) }
+        : pipeline));
     } catch (err) {
       console.error(err);
     } finally {
       setIsPending(false);
     }
+  };
+
+  const persistStageOrder = async (nextStages: Stage[]) => {
+    if (!selectedPipeline) return;
+    const previousStages = stages;
+    const normalized = nextStages.map((stage, order) => ({ ...stage, order }));
+    setStages(normalized);
+    setPipelineList(pipelineList.map((pipeline) => pipeline.id === selectedPipeline.id
+      ? { ...pipeline, stages: normalized }
+      : pipeline));
+    setStageOrderMessage('Salvando nova ordem...');
+    try {
+      await reorderStages(projectId, selectedPipeline.id, normalized.map((stage) => stage.id));
+      setStageOrderMessage('Ordem salva. Leads e histórico foram preservados.');
+    } catch (error) {
+      setStages(previousStages);
+      setPipelineList(pipelineList.map((pipeline) => pipeline.id === selectedPipeline.id
+        ? { ...pipeline, stages: previousStages }
+        : pipeline));
+      setStageOrderMessage('Não foi possível salvar. A ordem anterior foi restaurada.');
+      alert(error instanceof Error ? error.message : 'Erro ao reordenar as etapas.');
+    }
+  };
+
+  const moveStage = (stageId: string, direction: -1 | 1) => {
+    const currentIndex = stages.findIndex((stage) => stage.id === stageId);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= stages.length) return;
+    const next = [...stages];
+    [next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]];
+    void persistStageOrder(next);
+  };
+
+  const dropStage = (targetStageId: string) => {
+    if (!draggedStageId || draggedStageId === targetStageId) return setDraggedStageId(null);
+    const sourceIndex = stages.findIndex((stage) => stage.id === draggedStageId);
+    const targetIndex = stages.findIndex((stage) => stage.id === targetStageId);
+    if (sourceIndex < 0 || targetIndex < 0) return setDraggedStageId(null);
+    const next = [...stages];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    setDraggedStageId(null);
+    void persistStageOrder(next);
   };
 
   const handleGenerateApiKey = async () => {
@@ -793,25 +928,55 @@ ${fieldsHtml}
     }
   };
 
+  const resetCustomEditor = () => {
+    setNewFieldName('');
+    setNewFieldInternalName('');
+    setNewFieldOptions('');
+    setNewFieldHelpText('');
+    setNewFieldDefaultValue('');
+    setNewFieldRequired(false);
+    setNewFieldMin('');
+    setNewFieldMax('');
+    setNewFieldPattern('');
+    setNewFieldType('TEXT');
+    setEditingCustomId(null);
+  };
+
   const handleAddCustom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFieldName.trim()) return;
     setIsPending(true);
 
     let parsedOptions = null;
-    if (newFieldType === 'SELECT' && newFieldOptions.trim()) {
+    if (['SELECT', 'MULTI_SELECT'].includes(newFieldType) && newFieldOptions.trim()) {
       parsedOptions = JSON.stringify(newFieldOptions.split(',').map(s => s.trim()));
     }
 
+    const validationRules = JSON.stringify({
+      ...(newFieldMin !== '' ? { min: Number(newFieldMin) } : {}),
+      ...(newFieldMax !== '' ? { max: Number(newFieldMax) } : {}),
+      ...(newFieldPattern.trim() ? { pattern: newFieldPattern.trim() } : {}),
+    });
+
     try {
-      const created = await createCustomFieldDefinition(projectId, {
+      const payload = {
         name: newFieldName,
-        type: newFieldType,
-        options: parsedOptions || undefined
-      });
-      setCustomList([...customList, created]);
-      setNewFieldName('');
-      setNewFieldOptions('');
+        internalName: newFieldInternalName,
+        type: newFieldType as any,
+        options: parsedOptions || undefined,
+        helpText: newFieldHelpText,
+        defaultValue: newFieldDefaultValue,
+        validationRules,
+        required: newFieldRequired,
+      };
+      if (editingCustomId) {
+        const updated = await updateCustomFieldDefinition(projectId, editingCustomId, payload);
+        setCustomList(customList.map((field) => field.id === editingCustomId ? updated : field));
+      } else {
+        const created = await createCustomFieldDefinition(projectId, payload);
+        setCustomList([...customList, created]);
+      }
+      resetCustomEditor();
     } catch (err) {
       console.error(err);
     } finally {
@@ -819,8 +984,50 @@ ${fieldsHtml}
     }
   };
 
+  const handleEditCustom = (field: CustomFieldDef) => {
+    let rules: { min?: number; max?: number; pattern?: string } = {};
+    try { rules = field.validationRules ? JSON.parse(field.validationRules) : {}; } catch { rules = {}; }
+    setEditingCustomId(field.id);
+    setNewFieldName(field.name);
+    setNewFieldInternalName(field.internalName);
+    setNewFieldType(field.type);
+    try { setNewFieldOptions(field.options ? JSON.parse(field.options).join(', ') : ''); } catch { setNewFieldOptions(''); }
+    setNewFieldHelpText(field.helpText || '');
+    setNewFieldDefaultValue(field.defaultValue || '');
+    setNewFieldRequired(field.required);
+    setNewFieldMin(rules.min === undefined ? '' : String(rules.min));
+    setNewFieldMax(rules.max === undefined ? '' : String(rules.max));
+    setNewFieldPattern(rules.pattern || '');
+  };
+
+  const handleToggleCustom = async (field: CustomFieldDef) => {
+    try {
+      const updated = await updateCustomFieldDefinition(projectId, field.id, { isActive: !field.isActive });
+      setCustomList(customList.map((item) => item.id === field.id ? updated : item));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Erro ao alterar o campo.');
+    }
+  };
+
+  const moveCustomField = async (fieldId: string, direction: -1 | 1) => {
+    const index = customList.findIndex((field) => field.id === fieldId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= customList.length) return;
+    const previous = customList;
+    const next = [...customList];
+    [next[index], next[target]] = [next[target], next[index]];
+    const normalized = next.map((field, order) => ({ ...field, order }));
+    setCustomList(normalized);
+    try {
+      await reorderCustomFieldDefinitions(projectId, normalized.map((field) => field.id));
+    } catch (error) {
+      setCustomList(previous);
+      alert(error instanceof Error ? error.message : 'Erro ao reordenar os campos.');
+    }
+  };
+
   const handleDeleteCustom = async (defId: string) => {
-    if (!confirm('Deseja excluir este campo personalizado? Todos os valores salvos nos leads serão excluídos.')) return;
+    if (!confirm('Deseja arquivar este campo? Os valores existentes serão preservados e o campo ficará oculto.')) return;
     setIsPending(true);
     try {
       await deleteCustomFieldDefinition(projectId, defId);
@@ -842,32 +1049,109 @@ ${fieldsHtml}
       email: mappingEmail,
       phone: mappingPhone,
       company: mappingCompany,
-      value: mappingValue
+      value: mappingValue,
+      customFields: customWebhookMappings,
     };
 
     try {
-      const created = await createWebhookEndpoint(projectId, {
-        name: newWebhookName,
-        targetStageId: newWebhookStageId || stages[0]?.id,
-        originId: newWebhookOriginId || undefined,
-        fieldMapping: JSON.stringify(mapping)
-      });
-      
-      const newWebhookObj: WebhookEndpoint = {
-        id: created.id,
-        name: created.name,
-        token: created.token,
-        targetStageId: created.targetStageId,
-        originId: created.originId,
-        origin: originsList.find(o => o.id === created.originId) || null,
-        fieldMapping: created.fieldMapping
-      };
+      let saved;
+      if (newWebhookDirection === 'OUTGOING') {
+        let headers: Record<string, string> | undefined;
+        if (outgoingWebhookHeaders.trim()) {
+          const parsed = JSON.parse(outgoingWebhookHeaders);
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Os headers devem ser um objeto JSON.');
+          headers = Object.fromEntries(Object.entries(parsed).map(([key, value]) => [key, String(value)]));
+        }
+        const outgoingData = {
+          name: newWebhookName,
+          url: outgoingWebhookUrl,
+          method: outgoingWebhookMethod,
+          events: outgoingWebhookEvents as any,
+          payloadFields: outgoingPayloadFields,
+          headers,
+          timeoutMs: Number(outgoingWebhookTimeout),
+        };
+        saved = editingWebhookId
+          ? await updateWebhookEndpoint(projectId, editingWebhookId, outgoingData)
+          : await createOutgoingWebhook(projectId, outgoingData);
+      } else {
+        const incomingData = {
+          name: newWebhookName,
+          targetStageId: newWebhookStageId || stages[0]?.id,
+          originId: newWebhookOriginId || null,
+          fieldMapping: JSON.stringify(mapping),
+        };
+        saved = editingWebhookId
+          ? await updateWebhookEndpoint(projectId, editingWebhookId, incomingData)
+          : await createWebhookEndpoint(projectId, incomingData);
+      }
 
-      setWebhooksList([...webhooksList, newWebhookObj]);
+      const normalized = { ...saved, origin: originsList.find(o => o.id === saved.originId) || null } as WebhookEndpoint;
+      setWebhooksList(editingWebhookId
+        ? webhooksList.map((webhook) => webhook.id === editingWebhookId ? normalized : webhook)
+        : [...webhooksList, normalized]);
       setNewWebhookName('');
       setNewWebhookOriginId('');
+      setEditingWebhookId(null);
     } catch (err) {
-      console.error(err);
+      alert(err instanceof Error ? err.message : 'Erro ao salvar o webhook.');
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  const handleEditWebhook = (webhook: WebhookEndpoint) => {
+    setEditingWebhookId(webhook.id);
+    setNewWebhookName(webhook.name);
+    setNewWebhookDirection(webhook.direction as 'INCOMING' | 'OUTGOING');
+    if (webhook.direction === 'OUTGOING') {
+      setOutgoingWebhookUrl(webhook.url || '');
+      setOutgoingWebhookMethod(webhook.method as 'POST' | 'PUT' | 'PATCH');
+      try { setOutgoingWebhookEvents(JSON.parse(webhook.events)); } catch { setOutgoingWebhookEvents([]); }
+      try { setOutgoingPayloadFields(JSON.parse(webhook.payloadFields)); } catch { setOutgoingPayloadFields([]); }
+      setOutgoingWebhookTimeout(String(webhook.timeoutMs));
+      setOutgoingWebhookHeaders('');
+    } else {
+      setNewWebhookStageId(webhook.targetStageId || '');
+      setNewWebhookOriginId(webhook.originId || '');
+      try {
+        const mapping = JSON.parse(webhook.fieldMapping);
+        setMappingName(mapping.name || 'name');
+        setMappingEmail(mapping.email || 'email');
+        setMappingPhone(mapping.phone || 'phone');
+        setMappingCompany(mapping.company || 'company');
+        setMappingValue(mapping.value || 'value');
+        setCustomWebhookMappings(mapping.customFields || {});
+      } catch { setCustomWebhookMappings({}); }
+    }
+  };
+
+  const handleToggleWebhook = async (webhook: WebhookEndpoint) => {
+    try {
+      const updated = await updateWebhookEndpoint(projectId, webhook.id, { isActive: !webhook.isActive });
+      setWebhooksList(webhooksList.map((item) => item.id === webhook.id ? { ...item, ...updated } : item));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Erro ao alterar o webhook.');
+    }
+  };
+
+  const handleTestWebhook = async (webhookId: string) => {
+    setIsPending(true);
+    try {
+      const result = await testOutgoingWebhook(projectId, webhookId);
+      alert(result.success ? `Teste concluído com HTTP ${result.statusCode}.` : `Falha no teste: ${result.responseBody}`);
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  const handleRetryWebhook = async (logId: string) => {
+    setIsPending(true);
+    try {
+      const result = await retryWebhookDelivery(projectId, logId);
+      alert(result.success ? `Reenvio concluído com HTTP ${result.statusCode}.` : `Falha no reenvio: ${result.responseBody}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Erro ao reenviar o webhook.');
     } finally {
       setIsPending(false);
     }
@@ -1075,7 +1359,8 @@ ${fieldsHtml}
               <div className="space-y-4">
                 <div className="border-t border-border-subtle pt-4">
                   <h3 className="text-xs font-bold text-white mb-1">Estágios do Funil (Colunas do Kanban)</h3>
-                  <p className="text-[10px] text-text-secondary">Defina as colunas do seu Kanban para este funil ativo.</p>
+                  <p className="text-[10px] text-text-secondary">Arraste as etapas ou use os botões para definir a ordem das colunas.</p>
+                  <p className="text-[10px] text-accent-light mt-1 min-h-4" aria-live="polite">{stageOrderMessage}</p>
                 </div>
 
                 {/* Formulário rápido */}
@@ -1113,18 +1398,50 @@ ${fieldsHtml}
 
                 {/* Listagem de Estágios */}
                 <div className="space-y-2.5">
-                  {stages.map((stage) => (
-                    <div key={stage.id} className="flex items-center justify-between p-3.5 bg-glass-2 border border-border-subtle rounded-xl text-xs">
+                  {stages.map((stage, index) => (
+                    <div
+                      key={stage.id}
+                      draggable
+                      onDragStart={() => setDraggedStageId(stage.id)}
+                      onDragEnd={() => setDraggedStageId(null)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => dropStage(stage.id)}
+                      className={`flex items-center justify-between p-3.5 bg-glass-2 border rounded-xl text-xs transition-all ${
+                        draggedStageId === stage.id ? 'border-accent opacity-60' : 'border-border-subtle'
+                      }`}
+                    >
                       <div className="flex items-center gap-2 text-white font-semibold">
+                        <GripVertical className="h-4 w-4 text-text-tertiary cursor-grab" aria-hidden="true" />
                         <span className="h-3 w-3 rounded-full border border-black/20" style={{ backgroundColor: stage.color }} />
                         {stage.name}
                       </div>
-                      <button
-                        onClick={() => handleDeleteStage(stage.id)}
-                        className="text-text-tertiary hover:text-danger p-1 cursor-pointer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={index === 0 || isPending}
+                          onClick={() => moveStage(stage.id, -1)}
+                          className="text-text-tertiary hover:text-white p-1 cursor-pointer disabled:opacity-30"
+                          aria-label={`Mover ${stage.name} para a esquerda`}
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === stages.length - 1 || isPending}
+                          onClick={() => moveStage(stage.id, 1)}
+                          className="text-text-tertiary hover:text-white p-1 cursor-pointer disabled:opacity-30"
+                          aria-label={`Mover ${stage.name} para a direita`}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStage(stage.id)}
+                          className="text-text-tertiary hover:text-danger p-1 cursor-pointer"
+                          aria-label={`Excluir ${stage.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1298,7 +1615,7 @@ ${fieldsHtml}
             {/* Form */}
             <form onSubmit={handleAddCustom} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-glass-1 border border-border-subtle p-4 rounded-xl items-end">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-text-secondary uppercase">Nome do Campo</label>
+                <label className="text-[10px] font-bold text-text-secondary uppercase">Rótulo visível</label>
                 <input
                   required
                   type="text"
@@ -1310,6 +1627,20 @@ ${fieldsHtml}
               </div>
 
               <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-secondary uppercase">Nome interno</label>
+                <input
+                  required
+                  disabled={Boolean(editingCustomId)}
+                  type="text"
+                  placeholder="Ex: faturamento_mensal"
+                  value={newFieldInternalName}
+                  onChange={(e) => setNewFieldInternalName(e.target.value)}
+                  className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent font-mono disabled:opacity-60"
+                />
+                {editingCustomId && <span className="text-[9px] text-text-tertiary">A chave interna é estável para não quebrar formulários e integrações.</span>}
+              </div>
+
+              <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-text-secondary uppercase">Tipo de Dado</label>
                 <select
                   value={newFieldType}
@@ -1317,12 +1648,22 @@ ${fieldsHtml}
                   className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent"
                 >
                   <option value="TEXT">Texto Livre</option>
+                  <option value="LONG_TEXT">Texto Longo</option>
                   <option value="NUMBER">Número</option>
+                  <option value="CURRENCY">Moeda</option>
+                  <option value="DATE">Data</option>
+                  <option value="DATETIME">Data e Hora</option>
+                  <option value="PHONE">Telefone</option>
+                  <option value="EMAIL">E-mail</option>
+                  <option value="URL">URL</option>
                   <option value="SELECT">Seleção Única (Dropdown)</option>
+                  <option value="MULTI_SELECT">Seleção Múltipla</option>
+                  <option value="CHECKBOX">Checkbox</option>
+                  <option value="BOOLEAN">Sim / Não</option>
                 </select>
               </div>
 
-              {newFieldType === 'SELECT' && (
+              {['SELECT', 'MULTI_SELECT'].includes(newFieldType) && (
                 <div className="flex flex-col gap-1.5 col-span-2">
                   <label className="text-[10px] font-bold text-text-secondary uppercase">Opções (separadas por vírgula)</label>
                   <input
@@ -1336,31 +1677,65 @@ ${fieldsHtml}
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={isPending}
-                className="px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all h-9 cursor-pointer col-span-1 sm:col-span-2"
-              >
-                Salvar Definição
-              </button>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-secondary uppercase">Texto de ajuda</label>
+                <input type="text" value={newFieldHelpText} onChange={(e) => setNewFieldHelpText(e.target.value)} className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent" />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-secondary uppercase">Valor padrão</label>
+                <input type="text" value={newFieldDefaultValue} onChange={(e) => setNewFieldDefaultValue(e.target.value)} className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-text-secondary uppercase">Mínimo</label>
+                  <input type="number" value={newFieldMin} onChange={(e) => setNewFieldMin(e.target.value)} className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-text-secondary uppercase">Máximo</label>
+                  <input type="number" value={newFieldMax} onChange={(e) => setNewFieldMax(e.target.value)} className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent" />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-secondary uppercase">Validação por expressão (opcional)</label>
+                <input type="text" value={newFieldPattern} onChange={(e) => setNewFieldPattern(e.target.value)} className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent font-mono" />
+              </div>
+
+              <label className="col-span-1 sm:col-span-2 flex items-center gap-2 text-xs text-white cursor-pointer">
+                <input type="checkbox" checked={newFieldRequired} onChange={(e) => setNewFieldRequired(e.target.checked)} className="accent-accent" />
+                Campo obrigatório nos registros e formulários em que for utilizado
+              </label>
+
+              <div className="col-span-1 sm:col-span-2 flex justify-end gap-2">
+                {editingCustomId && (
+                  <button type="button" onClick={resetCustomEditor} className="px-4 py-2 bg-glass-4 text-white font-bold text-xs rounded-lg">Cancelar</button>
+                )}
+                <button type="submit" disabled={isPending} className="px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all h-9 cursor-pointer">
+                  {editingCustomId ? 'Salvar alterações' : 'Salvar definição'}
+                </button>
+              </div>
             </form>
 
             {/* Listagem */}
             <div className="space-y-2">
-              {customList.map((c) => (
-                <div key={c.id} className="p-3.5 bg-glass-2 border border-border-subtle rounded-xl text-xs flex justify-between items-center">
+              {customList.map((c, index) => (
+                <div key={c.id} className={`p-3.5 bg-glass-2 border border-border-subtle rounded-xl text-xs flex justify-between items-center ${c.isActive ? '' : 'opacity-60'}`}>
                   <div>
                     <h4 className="font-bold text-white">{c.name}</h4>
                     <p className="text-[10px] text-text-secondary mt-0.5">
-                      Tipo: {c.type} {c.options && `• Opções: ${JSON.parse(c.options).join(', ')}`}
+                      <span className="font-mono">{c.internalName}</span> • {c.type} • {c.required ? 'Obrigatório' : 'Opcional'}
                     </p>
+                    {c.helpText && <p className="text-[10px] text-text-tertiary mt-1">{c.helpText}</p>}
                   </div>
-                  <button
-                    onClick={() => handleDeleteCustom(c.id)}
-                    className="text-text-tertiary hover:text-danger p-1 cursor-pointer"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button type="button" disabled={index === 0} onClick={() => moveCustomField(c.id, -1)} className="p-1 text-text-tertiary hover:text-white disabled:opacity-30" aria-label={`Mover ${c.name} para cima`}><ChevronUp className="h-4 w-4" /></button>
+                    <button type="button" disabled={index === customList.length - 1} onClick={() => moveCustomField(c.id, 1)} className="p-1 text-text-tertiary hover:text-white disabled:opacity-30" aria-label={`Mover ${c.name} para baixo`}><ChevronDown className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => handleEditCustom(c)} className="px-2 py-1 text-text-secondary hover:text-white">Editar</button>
+                    <button type="button" onClick={() => handleToggleCustom(c)} className="px-2 py-1 text-text-secondary hover:text-white">{c.isActive ? 'Pausar' : 'Ativar'}</button>
+                    <button onClick={() => handleDeleteCustom(c.id)} className="text-text-tertiary hover:text-danger p-1 cursor-pointer" aria-label={`Arquivar ${c.name}`}><Trash2 className="h-4 w-4" /></button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1371,8 +1746,8 @@ ${fieldsHtml}
         {activeTab === 'webhooks' && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-md font-bold text-white font-display mb-1">Webhooks de Entrada (Integrações)</h2>
-              <p className="text-xs text-text-secondary">Configure URLs para receber leads automaticamente de plataformas externas (Kiwify, WordPress).</p>
+              <h2 className="text-md font-bold text-white font-display mb-1">Webhooks e Integrações</h2>
+              <p className="text-xs text-text-secondary">Receba leads ou envie eventos do CRM com payloads configuráveis e histórico de tentativas.</p>
             </div>
 
             {/* Form */}
@@ -1388,6 +1763,16 @@ ${fieldsHtml}
                   className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent"
                 />
               </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-text-secondary uppercase">Direção</label>
+                <select value={newWebhookDirection} disabled={Boolean(editingWebhookId)} onChange={(e) => setNewWebhookDirection(e.target.value as 'INCOMING' | 'OUTGOING')} className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent disabled:opacity-60">
+                  <option value="INCOMING">Entrada — recebe leads</option>
+                  <option value="OUTGOING">Saída — envia eventos</option>
+                </select>
+              </div>
+
+              {newWebhookDirection === 'INCOMING' ? (<>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-text-secondary uppercase">Estágio de Destino</label>
@@ -1424,7 +1809,7 @@ ${fieldsHtml}
 
               {/* Mapeamento simples */}
               <div className="col-span-2 border-t border-border-subtle pt-4 mt-2">
-                <h4 className="text-xs font-bold text-white mb-3">Mapeamento de Campos (Nome da chave do JSON enviado)</h4>
+                <h4 className="text-xs font-bold text-white mb-3">Mapeamento de entrada (caminho da chave no JSON recebido)</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="flex flex-col gap-1 text-[10px]">
                     <label className="text-text-secondary">Nome do Lead</label>
@@ -1447,14 +1832,83 @@ ${fieldsHtml}
                     <input type="text" value={mappingValue} onChange={e => setMappingValue(e.target.value)} className="bg-bg-base border border-border-subtle rounded px-2.5 py-1 text-xs text-white" />
                   </div>
                 </div>
+                {customList.filter((field) => field.isActive).length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 border-t border-border-subtle pt-3">
+                    {customList.filter((field) => field.isActive).map((field) => (
+                      <div key={field.id} className="flex flex-col gap-1 text-[10px]">
+                        <label className="text-text-secondary">{field.name}</label>
+                        <input type="text" placeholder={`custom.${field.internalName}`} value={customWebhookMappings[field.id] || ''} onChange={(event) => setCustomWebhookMappings({ ...customWebhookMappings, [field.id]: event.target.value })} className="bg-bg-base border border-border-subtle rounded px-2.5 py-1 text-xs text-white" />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              </>) : (<>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-text-secondary uppercase">URL pública de destino</label>
+                  <input required type="url" value={outgoingWebhookUrl} onChange={(event) => setOutgoingWebhookUrl(event.target.value)} placeholder="https://sistema.exemplo.com/webhooks" className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase">Método</label>
+                    <select value={outgoingWebhookMethod} onChange={(event) => setOutgoingWebhookMethod(event.target.value as 'POST' | 'PUT' | 'PATCH')} className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white"><option>POST</option><option>PUT</option><option>PATCH</option></select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase">Timeout (ms)</label>
+                    <input type="number" min="1000" max="30000" value={outgoingWebhookTimeout} onChange={(event) => setOutgoingWebhookTimeout(event.target.value)} className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white" />
+                  </div>
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <label className="text-[10px] font-bold text-text-secondary uppercase">Eventos</label>
+                  <div className="flex flex-wrap gap-3">
+                    {[['lead.created', 'Lead criado'], ['lead.updated', 'Lead atualizado'], ['lead.stage_changed', 'Etapa alterada']].map(([event, label]) => (
+                      <label key={event} className="flex items-center gap-2 text-xs text-white"><input type="checkbox" checked={outgoingWebhookEvents.includes(event)} onChange={(input) => setOutgoingWebhookEvents(input.target.checked ? [...outgoingWebhookEvents, event] : outgoingWebhookEvents.filter((item) => item !== event))} className="accent-accent" />{label}</label>
+                    ))}
+                  </div>
+                </div>
+                <div className="col-span-2 space-y-3 border-t border-border-subtle pt-4">
+                  <div className="flex justify-between items-center">
+                    <div><h4 className="text-xs font-bold text-white">Campos do payload</h4><p className="text-[10px] text-text-secondary">Renomeie chaves, selecione campos do CRM ou adicione valores estáticos.</p></div>
+                    <button type="button" onClick={() => setOutgoingPayloadFields([...outgoingPayloadFields, { key: '', sourceType: 'FIELD', source: 'name' }])} className="px-2.5 py-1.5 bg-accent/15 text-accent-light rounded text-[10px] font-bold">Adicionar campo</button>
+                  </div>
+                  {outgoingPayloadFields.map((field, index) => (
+                    <div key={index} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1.4fr_auto] gap-2 items-center bg-bg-base p-2 rounded-lg border border-border-subtle">
+                      <input aria-label="Chave do payload" value={field.key} onChange={(event) => { const next = [...outgoingPayloadFields]; next[index] = { ...field, key: event.target.value }; setOutgoingPayloadFields(next); }} placeholder="chave_destino" className="bg-glass-2 border border-border-subtle rounded px-2 py-1.5 text-xs text-white font-mono" />
+                      <select value={field.sourceType} onChange={(event) => { const next = [...outgoingPayloadFields]; next[index] = { ...field, sourceType: event.target.value as any }; setOutgoingPayloadFields(next); }} className="bg-glass-2 border border-border-subtle rounded px-2 py-1.5 text-xs text-white"><option value="FIELD">Campo padrão</option><option value="CUSTOM">Personalizado</option><option value="STATIC">Valor estático</option></select>
+                      {field.sourceType === 'STATIC' ? (
+                        <input value={field.staticValue || ''} onChange={(event) => { const next = [...outgoingPayloadFields]; next[index] = { ...field, staticValue: event.target.value }; setOutgoingPayloadFields(next); }} placeholder="Valor" className="bg-glass-2 border border-border-subtle rounded px-2 py-1.5 text-xs text-white" />
+                      ) : field.sourceType === 'CUSTOM' ? (
+                        <select value={field.source || ''} onChange={(event) => { const next = [...outgoingPayloadFields]; next[index] = { ...field, source: event.target.value }; setOutgoingPayloadFields(next); }} className="bg-glass-2 border border-border-subtle rounded px-2 py-1.5 text-xs text-white"><option value="">Selecione...</option>{customList.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.internalName}>{item.name}</option>)}</select>
+                      ) : (
+                        <select value={field.source || ''} onChange={(event) => { const next = [...outgoingPayloadFields]; next[index] = { ...field, source: event.target.value }; setOutgoingPayloadFields(next); }} className="bg-glass-2 border border-border-subtle rounded px-2 py-1.5 text-xs text-white">{['id','name','email','phone','company','priority','value','pipelineId','stageId','originId','createdAt','updatedAt','event'].map((source) => <option key={source} value={source}>{source}</option>)}</select>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <label className="text-[9px] text-text-secondary"><input type="checkbox" checked={Boolean(field.required)} onChange={(event) => { const next = [...outgoingPayloadFields]; next[index] = { ...field, required: event.target.checked }; setOutgoingPayloadFields(next); }} className="accent-accent" /> obrigatório</label>
+                        <button type="button" disabled={index === 0} onClick={() => { const next = [...outgoingPayloadFields]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; setOutgoingPayloadFields(next); }} className="text-text-secondary p-1 disabled:opacity-30" aria-label="Mover campo para cima"><ChevronUp className="h-3.5 w-3.5" /></button>
+                        <button type="button" disabled={index === outgoingPayloadFields.length - 1} onClick={() => { const next = [...outgoingPayloadFields]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; setOutgoingPayloadFields(next); }} className="text-text-secondary p-1 disabled:opacity-30" aria-label="Mover campo para baixo"><ChevronDown className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => setOutgoingPayloadFields(outgoingPayloadFields.filter((_, itemIndex) => itemIndex !== index))} className="text-danger p-1"><Trash2 className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="rounded-lg border border-border-subtle bg-bg-base p-3">
+                    <p className="mb-2 text-[10px] font-bold uppercase text-text-secondary">Prévia do payload</p>
+                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-[10px] text-accent-light">{JSON.stringify(Object.fromEntries(outgoingPayloadFields.filter((field) => field.key.trim()).map((field) => [field.key.trim(), field.sourceType === 'STATIC' ? (field.staticValue || '') : field.sourceType === 'CUSTOM' ? `&lt;${field.source || 'campo_personalizado'}&gt;` : `&lt;${field.source || 'campo'}&gt;`])), null, 2)}</pre>
+                  </div>
+                </div>
+                <div className="col-span-2 flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-text-secondary uppercase">Headers personalizados (JSON criptografado)</label>
+                  <textarea value={outgoingWebhookHeaders} onChange={(event) => setOutgoingWebhookHeaders(event.target.value)} placeholder='{"Authorization":"Bearer ..."}' className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white font-mono min-h-20" />
+                  {editingWebhookId && <span className="text-[9px] text-text-tertiary">Deixe vazio para preservar os headers já armazenados.</span>}
+                </div>
+              </>)}
 
               <button
                 type="submit"
                 disabled={isPending}
                 className="px-4 py-2 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg transition-all h-9 cursor-pointer col-span-2 mt-4"
               >
-                Gerar Webhook Endpoint
+                {editingWebhookId ? 'Salvar webhook' : 'Criar webhook'}
               </button>
             </form>
 
@@ -1463,30 +1917,31 @@ ${fieldsHtml}
               {webhooksList.map((webhook) => {
                 const webhookUrl = `${baseUrl}/api/webhooks/incoming/${webhook.token}`;
                 return (
-                  <div key={webhook.id} className="p-4 bg-glass-2 border border-border-subtle rounded-xl text-xs space-y-3 relative">
-                    <button
-                      onClick={() => handleDeleteWebhook(webhook.id)}
-                      className="absolute top-4 right-4 text-text-tertiary hover:text-danger p-1 cursor-pointer"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  <div key={webhook.id} className={`p-4 bg-glass-2 border border-border-subtle rounded-xl text-xs space-y-3 relative ${webhook.isActive ? '' : 'opacity-60'}`}>
+                    <div className="absolute top-4 right-4 flex items-center gap-1">
+                      {webhook.direction === 'OUTGOING' && <button type="button" disabled={isPending} onClick={() => handleTestWebhook(webhook.id)} className="px-2 py-1 text-accent-light hover:text-accent">Testar</button>}
+                      <button type="button" onClick={() => handleEditWebhook(webhook)} className="px-2 py-1 text-text-secondary hover:text-white">Editar</button>
+                      <button type="button" onClick={() => handleToggleWebhook(webhook)} className="px-2 py-1 text-text-secondary hover:text-white">{webhook.isActive ? 'Pausar' : 'Ativar'}</button>
+                      <button onClick={() => handleDeleteWebhook(webhook.id)} className="text-text-tertiary hover:text-danger p-1 cursor-pointer" aria-label={`Arquivar ${webhook.name}`}><Trash2 className="h-4 w-4" /></button>
+                    </div>
                     <div>
-                      <h4 className="font-bold text-white text-sm">{webhook.name}</h4>
+                      <h4 className="font-bold text-white text-sm pr-56">{webhook.name} <span className="text-[9px] text-accent-light uppercase ml-2">{webhook.direction === 'OUTGOING' ? 'Saída' : 'Entrada'}</span></h4>
                       <p className="text-[10px] text-text-secondary mt-0.5">
-                        Destino: {stages.find(s => s.id === webhook.targetStageId)?.name || 'Estágio Desconhecido'} 
-                        {webhook.origin && ` • Origem: ${webhook.origin.name}`}
+                        {webhook.direction === 'OUTGOING'
+                          ? `${webhook.method} • ${(() => { try { return JSON.parse(webhook.events).join(', '); } catch { return 'Sem eventos'; } })()}`
+                          : `Destino: ${pipelineList.flatMap((pipeline) => pipeline.stages).find((stage) => stage.id === webhook.targetStageId)?.name || 'Etapa inválida'}${webhook.origin ? ` • Origem: ${webhook.origin.name}` : ''}`}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2 bg-bg-base border border-border-subtle rounded-lg p-2">
-                      <span className="text-[10px] text-text-tertiary select-all truncate flex-1 font-mono">{webhookUrl}</span>
-                      <button
+                      <span className="text-[10px] text-text-tertiary select-all truncate flex-1 font-mono">{webhook.direction === 'OUTGOING' ? webhook.url : webhookUrl}</span>
+                      {webhook.direction === 'INCOMING' && <button
                         onClick={() => copyToClipboard(webhookUrl)}
                         className="p-1 text-accent hover:text-accent-light cursor-pointer"
                         title="Copiar URL"
                       >
                         <Clipboard className="h-4 w-4" />
-                      </button>
+                      </button>}
                     </div>
                   </div>
                 );
@@ -1506,19 +1961,20 @@ ${fieldsHtml}
                   webhookLogs.map((log) => (
                     <div key={log.id} className="p-3 bg-bg-base border border-border-subtle rounded-lg text-[10px] space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-white">{log.webhook.name}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        <span className="font-bold text-white">{log.webhook.name}{log.event ? ` • ${log.event}` : ''}</span>
+                        <div className="flex items-center gap-2"><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                           log.status === 'SUCCESS' ? 'bg-accent/10 text-accent-light' : 'bg-danger/10 text-danger'
                         }`}>
-                          {log.status}
-                        </span>
+                          {log.status}{log.statusCode ? ` • HTTP ${log.statusCode}` : ''}
+                        </span>{log.status === 'ERROR' && log.event && <button type="button" disabled={isPending} onClick={() => handleRetryWebhook(log.id)} className="text-accent-light hover:text-accent disabled:opacity-50">Reenviar</button>}</div>
                       </div>
                       <p className="text-text-tertiary font-mono text-[9px] select-all truncate bg-glass-1 p-1 rounded border border-border-subtle">
                         {log.payload}
                       </p>
                       {log.errorDetails && <p className="text-danger font-semibold font-mono text-[9px]">{log.errorDetails}</p>}
+                      {log.responseBody && <p className="max-h-16 overflow-auto whitespace-pre-wrap text-text-secondary font-mono text-[9px]">Resposta: {log.responseBody}</p>}
                       <div className="text-[9px] text-text-secondary text-right">
-                        {new Date(log.createdAt).toLocaleString('pt-BR')}
+                        Tentativa {log.attempt}{log.durationMs !== null ? ` • ${log.durationMs} ms` : ''} • {new Date(log.createdAt).toLocaleString('pt-BR')}
                       </div>
                     </div>
                   ))
@@ -2036,7 +2492,7 @@ ${fieldsHtml}
                         {!formFields.some(f => f.fieldName === 'phone') && <option value="phone">WhatsApp / Telefone</option>}
                       </optgroup>
                       <optgroup label="Campos Personalizados">
-                        {initialCustomFieldDefs.map(def => (
+                        {customList.filter((def) => def.isActive).map(def => (
                           <option key={def.id} value={def.id}>{def.name} ({def.type})</option>
                         ))}
                       </optgroup>
@@ -2486,8 +2942,8 @@ ${fieldsHtml}
                   <li><strong className="text-white">.nfs-form</strong>: Aplica-se à tag &lt;form&gt; principal.</li>
                   <li><strong className="text-white">.nfs-field</strong>: Div contendo um campo (rótulo + input).</li>
                   <li><strong className="text-white">.nfs-label</strong>: A tag &lt;label&gt; do campo.</li>
-                  <li><strong className="text-white">.nfs-input</strong>: Os campos de entrada (&lt;input type="text"&gt; ou &lt;input type="email"&gt;).</li>
-                  <li><strong className="text-white">.nfs-button</strong>: O botão &lt;button type="submit"&gt; de envio.</li>
+                  <li><strong className="text-white">.nfs-input</strong>: Os campos de entrada (&lt;input type=&quot;text&quot;&gt; ou &lt;input type=&quot;email&quot;&gt;).</li>
+                  <li><strong className="text-white">.nfs-button</strong>: O botão &lt;button type=&quot;submit&quot;&gt; de envio.</li>
                 </ul>
               </div>
             </div>

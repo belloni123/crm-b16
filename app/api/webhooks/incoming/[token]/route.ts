@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createOrUpdateDeduplicatedLead } from '@/lib/leads';
+import { normalizeCustomFieldValue, parseFieldOptions, parseValidationRules, type CustomFieldType } from '@/lib/custom-fields';
+import { dispatchLeadWebhooks, serializeWebhookLogPayload } from '@/lib/webhooks';
 
 // Helper recursivo para buscar propriedades aninhadas em objetos (ex: "customer.name" ou "body.customer.name")
 function getNestedValue(obj: any, path: string): any {
@@ -31,11 +33,15 @@ export async function POST(
     where: { token },
   });
 
-  if (!webhook) {
+  if (!webhook || webhook.direction !== 'INCOMING' || !webhook.isActive || webhook.deletedAt) {
     return NextResponse.json(
       { error: 'Endpoint de webhook inválido ou inexistente.' },
       { status: 404 }
     );
+  }
+
+  if (!webhook.targetStageId) {
+    return NextResponse.json({ error: 'Este webhook precisa ter uma etapa de destino válida.' }, { status: 409 });
   }
 
   let body: any = {};
@@ -99,6 +105,45 @@ export async function POST(
       null // Sem operador autenticado
     );
 
+    const customMappings = mapping.customFields && typeof mapping.customFields === 'object'
+      ? Object.entries(mapping.customFields) as Array<[string, string]>
+      : [];
+    if (customMappings.length > 0) {
+      const definitions = await prisma.customFieldDefinition.findMany({
+        where: {
+          projectId: webhook.projectId,
+          isActive: true,
+          deletedAt: null,
+          OR: [
+            { id: { in: customMappings.map(([identifier]) => identifier) } },
+            { internalName: { in: customMappings.map(([identifier]) => identifier) } },
+          ],
+        },
+      });
+      const definitionsByIdentifier = new Map(definitions.flatMap((definition) => [
+        [definition.id, definition],
+        [definition.internalName, definition],
+      ]));
+
+      for (const [identifier, sourcePath] of customMappings) {
+        const definition = definitionsByIdentifier.get(identifier);
+        if (!definition) continue;
+        const rawValue = getNestedValue(body, sourcePath);
+        const value = normalizeCustomFieldValue(
+          definition.type as CustomFieldType,
+          rawValue,
+          parseFieldOptions(definition.options),
+          parseValidationRules(definition.validationRules),
+        );
+        if (value === '') continue;
+        await prisma.customFieldValue.upsert({
+          where: { fieldDefinitionId_leadId: { fieldDefinitionId: definition.id, leadId: lead.id } },
+          create: { fieldDefinitionId: definition.id, leadId: lead.id, value },
+          update: { value },
+        });
+      }
+    }
+
     // Registra log de atividade específico do webhook
     await prisma.activity.create({
       data: {
@@ -112,11 +157,13 @@ export async function POST(
     await prisma.webhookLog.create({
       data: {
         webhookId: webhook.id,
-        payload: JSON.stringify(body),
+        payload: serializeWebhookLogPayload(body),
         status: 'SUCCESS',
         errorDetails: null,
       },
     });
+
+    await dispatchLeadWebhooks(webhook.projectId, lead.id, 'lead.updated');
 
     return NextResponse.json({
       success: true,
@@ -131,14 +178,14 @@ export async function POST(
     await prisma.webhookLog.create({
       data: {
         webhookId: webhook.id,
-        payload: JSON.stringify(body),
+        payload: serializeWebhookLogPayload(body),
         status: 'ERROR',
         errorDetails: err.message || 'Erro de processamento ou inserção no banco de dados.',
       },
     });
 
     return NextResponse.json(
-      { error: 'Erro interno ao processar o webhook.', details: err.message },
+      { error: 'Erro interno ao processar o webhook.' },
       { status: 500 }
     );
   }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createOrUpdateDeduplicatedLead } from '@/lib/leads';
+import { normalizeCustomFieldValue, parseFieldOptions, parseValidationRules, type CustomFieldType } from '@/lib/custom-fields';
+import { dispatchLeadWebhooks } from '@/lib/webhooks';
 
 // Store global para o rate limiter de IPs dos formulários
 const globalRef = globalThis as any;
@@ -212,7 +214,7 @@ export async function POST(
   const form = await prisma.form.findUnique({
     where: { token },
     include: {
-      fields: true
+      fields: { include: { customFieldDefinition: true } }
     }
   });
 
@@ -232,7 +234,16 @@ export async function POST(
     } else {
       const formData = await request.formData();
       formData.forEach((value, key) => {
-        body[key] = value.toString();
+        const nextValue = value.toString();
+        const currentValue = body[key];
+        if (currentValue === undefined) {
+          body[key] = nextValue;
+        } else {
+          const values = typeof currentValue === 'string' && currentValue.startsWith('[')
+            ? JSON.parse(currentValue)
+            : [currentValue];
+          body[key] = JSON.stringify([...values, nextValue]);
+        }
       });
     }
   } catch (err) {
@@ -265,6 +276,7 @@ export async function POST(
   // 6. Validar Campos Obrigatórios configurados no formulário
   const missingFields: string[] = [];
   for (const field of form.fields) {
+    if (field.type === 'CUSTOM' && (!field.customFieldDefinition?.isActive || field.customFieldDefinition.deletedAt)) continue;
     if (field.required) {
       const val = body[field.fieldName];
       if (val === undefined || val === null || val.toString().trim() === '') {
@@ -302,10 +314,15 @@ export async function POST(
           phone = '55' + phone;
         }
       }
-    } else if (field.type === 'CUSTOM' && field.customFieldDefinitionId && val) {
+    } else if (field.type === 'CUSTOM' && field.customFieldDefinitionId && field.customFieldDefinition && val) {
       customFieldValues.push({
         definitionId: field.customFieldDefinitionId,
-        value: val
+        value: normalizeCustomFieldValue(
+          field.customFieldDefinition.type as CustomFieldType,
+          val,
+          parseFieldOptions(field.customFieldDefinition.options),
+          parseValidationRules(field.customFieldDefinition.validationRules),
+        )
       });
     }
   }
@@ -341,28 +358,11 @@ export async function POST(
 
     // 9. Atualizar valores dos campos customizados coletados
     for (const cv of customFieldValues) {
-      const existingVal = await prisma.customFieldValue.findFirst({
-        where: { leadId: lead.id, fieldDefinitionId: cv.definitionId }
+      await prisma.customFieldValue.upsert({
+        where: { fieldDefinitionId_leadId: { fieldDefinitionId: cv.definitionId, leadId: lead.id } },
+        create: { leadId: lead.id, fieldDefinitionId: cv.definitionId, value: cv.value },
+        update: { value: cv.value },
       });
-
-      if (existingVal) {
-        if (cv.value === '') {
-          await prisma.customFieldValue.delete({ where: { id: existingVal.id } });
-        } else {
-          await prisma.customFieldValue.update({
-            where: { id: existingVal.id },
-            data: { value: cv.value }
-          });
-        }
-      } else if (cv.value !== '') {
-        await prisma.customFieldValue.create({
-          data: {
-            leadId: lead.id,
-            fieldDefinitionId: cv.definitionId,
-            value: cv.value
-          }
-        });
-      }
     }
 
     // 10. Gravar log no histórico de atividades do Lead
@@ -373,6 +373,8 @@ export async function POST(
         content: `Lead cadastrado via formulário embutido: "${form.name}".`
       }
     });
+
+    await dispatchLeadWebhooks(form.projectId, lead.id, 'lead.updated');
 
     // 11. Retornar resposta apropriada
     if (isJson) {

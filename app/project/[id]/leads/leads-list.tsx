@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { CustomFieldInput } from '@/components/custom-field-input';
 import { 
   getLeads, 
   getLeadById,
@@ -111,6 +112,9 @@ interface CustomField {
   name: string;
   type: string;
   options: string | null;
+  helpText?: string | null;
+  defaultValue?: string | null;
+  required?: boolean;
   valueId: string | null;
   value: string;
 }
@@ -1403,32 +1407,8 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
                           <label className="font-semibold text-text-secondary uppercase text-[10px]">
                             {field.name}
                           </label>
-                          {field.type === 'SELECT' ? (
-                            <select
-                              value={editingCustomFields[field.id] || ''}
-                              onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
-                              className="bg-bg-base border border-border-subtle rounded px-2.5 py-1.5 text-xs text-white outline-none"
-                            >
-                              <option value="">Selecione...</option>
-                              {(() => {
-                                try {
-                                  const opts = JSON.parse(field.options || '[]');
-                                  return opts.map((opt: string) => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                  ));
-                                } catch {
-                                  return null;
-                                }
-                              })()}
-                            </select>
-                          ) : (
-                            <input
-                              type={field.type === 'NUMBER' ? 'number' : 'text'}
-                              value={editingCustomFields[field.id] || ''}
-                              onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
-                              className="bg-bg-base border border-border-subtle rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-accent"
-                            />
-                          )}
+                          <CustomFieldInput field={field} value={editingCustomFields[field.id] || ''} onChange={(value) => handleCustomFieldChange(field.id, value)} />
+                          {field.helpText && <span className="text-[9px] text-text-tertiary">{field.helpText}</span>}
                         </div>
                       ))}
 

@@ -7,7 +7,7 @@ import { revalidatePath as nextRevalidatePath } from 'next/cache';
 function revalidatePath(path: string) {
   try {
     nextRevalidatePath(path);
-  } catch (err) {
+  } catch {
     // Ignore "static generation store missing" errors outside Next.js request context (e.g. during tsx tests)
   }
 }
@@ -16,6 +16,27 @@ import { getPhoneVariants } from '@/lib/utils';
 import bcrypt from 'bcryptjs';
 import { sendPasswordResetEmail } from '@/lib/mail';
 import { syncTaskToAllCalendars } from '@/lib/calendar';
+import {
+  CUSTOM_FIELD_TYPES,
+  type CustomFieldType,
+  normalizeCustomFieldValue,
+  normalizeInternalName,
+  parseFieldOptions,
+  parseValidationRules,
+} from '@/lib/custom-fields';
+import {
+  WEBHOOK_EVENTS,
+  WEBHOOK_METHODS,
+  assertSafeWebhookUrl,
+  deliverPreparedWebhook,
+  deliverWebhook,
+  dispatchLeadWebhooks,
+  encryptWebhookHeaders,
+  validatePayloadFields,
+  type WebhookEvent,
+  type WebhookMethod,
+  type WebhookPayloadField,
+} from '@/lib/webhooks';
 
 // ==========================================
 // FUNIS E ESTÁGIOS
@@ -93,6 +114,9 @@ export async function deletePipeline(projectId: string, pipelineId: string) {
 export async function createStage(projectId: string, pipelineId: string, data: { name: string; color: string; order: number }) {
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
 
+  const pipeline = await prisma.pipeline.findFirst({ where: { id: pipelineId, projectId } });
+  if (!pipeline) throw new Error('Kanban não encontrado.');
+
   const stage = await prisma.stage.create({
     data: {
       name: data.name,
@@ -110,6 +134,9 @@ export async function createStage(projectId: string, pipelineId: string, data: {
 export async function updateStage(projectId: string, stageId: string, data: { name: string; color: string; order: number }) {
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
 
+  const existing = await prisma.stage.findFirst({ where: { id: stageId, pipeline: { projectId } } });
+  if (!existing) throw new Error('Estágio não encontrado.');
+
   const stage = await prisma.stage.update({
     where: { id: stageId },
     data: {
@@ -122,6 +149,30 @@ export async function updateStage(projectId: string, stageId: string, data: { na
   revalidatePath(`/project/${projectId}`);
   revalidatePath(`/project/${projectId}/settings`);
   return stage;
+}
+
+export async function reorderStages(projectId: string, pipelineId: string, orderedStageIds: string[]) {
+  await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+
+  const stages = await prisma.stage.findMany({
+    where: { pipelineId, pipeline: { projectId } },
+    select: { id: true },
+  });
+  const currentIds = new Set(stages.map((stage) => stage.id));
+  const uniqueIds = new Set(orderedStageIds);
+
+  if (orderedStageIds.length !== stages.length || uniqueIds.size !== stages.length || orderedStageIds.some((id) => !currentIds.has(id))) {
+    throw new Error('A nova ordem precisa conter exatamente todas as etapas deste Kanban.');
+  }
+
+  await prisma.$transaction(
+    orderedStageIds.map((id, order) => prisma.stage.update({ where: { id }, data: { order } })),
+  );
+
+  revalidatePath(`/project/${projectId}`);
+  revalidatePath(`/project/${projectId}/kanban`);
+  revalidatePath(`/project/${projectId}/settings`);
+  return { success: true };
 }
 
 export async function deleteStage(projectId: string, stageId: string) {
@@ -302,27 +353,137 @@ export async function deleteLostStatus(projectId: string, lostStatusId: string) 
 export async function getCustomFieldDefinitions(projectId: string) {
   await requireProjectAccess(projectId);
   return prisma.customFieldDefinition.findMany({
-    where: { projectId },
-    orderBy: { name: 'asc' },
+    where: { projectId, deletedAt: null },
+    orderBy: [{ order: 'asc' }, { name: 'asc' }],
   });
 }
 
 export async function createCustomFieldDefinition(
   projectId: string,
-  data: { name: string; type: 'TEXT' | 'NUMBER' | 'SELECT'; options?: string }
+  data: {
+    name: string;
+    internalName?: string;
+    type: CustomFieldType;
+    options?: string;
+    helpText?: string;
+    defaultValue?: string;
+    validationRules?: string;
+    required?: boolean;
+  }
 ) {
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+  const name = data.name.trim();
+  const internalName = normalizeInternalName(data.internalName || name);
+  if (!name || !internalName) throw new Error('Informe um nome e um identificador interno válidos.');
+  if (!CUSTOM_FIELD_TYPES.includes(data.type)) throw new Error('Tipo de campo inválido.');
+
+  const options = parseFieldOptions(data.options);
+  if (['SELECT', 'MULTI_SELECT'].includes(data.type) && options.length === 0) {
+    throw new Error('Campos de seleção precisam de pelo menos uma opção.');
+  }
+
+  const duplicate = await prisma.customFieldDefinition.findFirst({ where: { projectId, internalName } });
+  if (duplicate) throw new Error('Já existe um campo com este nome interno.');
+  const last = await prisma.customFieldDefinition.findFirst({
+    where: { projectId, deletedAt: null },
+    orderBy: { order: 'desc' },
+    select: { order: true },
+  });
+
   const definition = await prisma.customFieldDefinition.create({
     data: {
-      name: data.name,
+      name,
+      internalName,
       type: data.type,
-      options: data.options || null,
+      options: options.length ? JSON.stringify(options) : null,
+      helpText: data.helpText?.trim() || null,
+      defaultValue: data.defaultValue || null,
+      validationRules: data.validationRules || null,
+      required: Boolean(data.required),
+      order: (last?.order ?? -1) + 1,
       projectId,
       entityType: 'LEAD',
     },
   });
   revalidatePath(`/project/${projectId}/settings`);
   return definition;
+}
+
+export async function updateCustomFieldDefinition(
+  projectId: string,
+  definitionId: string,
+  data: {
+    name?: string;
+    internalName?: string;
+    type?: CustomFieldType;
+    options?: string | null;
+    helpText?: string | null;
+    defaultValue?: string | null;
+    validationRules?: string | null;
+    required?: boolean;
+    isActive?: boolean;
+  },
+) {
+  await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+  const existing = await prisma.customFieldDefinition.findFirst({ where: { id: definitionId, projectId, deletedAt: null } });
+  if (!existing) throw new Error('Campo personalizado não encontrado.');
+
+  const type = data.type || (existing.type as CustomFieldType);
+  if (!CUSTOM_FIELD_TYPES.includes(type)) throw new Error('Tipo de campo inválido.');
+  if (data.type && data.type !== existing.type) {
+    const valueCount = await prisma.customFieldValue.count({ where: { fieldDefinitionId: definitionId } });
+    if (valueCount > 0) throw new Error('O tipo não pode ser alterado porque este campo já possui valores.');
+  }
+
+  const internalName = data.internalName === undefined ? existing.internalName : normalizeInternalName(data.internalName);
+  if (!internalName) throw new Error('Informe um nome interno válido.');
+  if (internalName !== existing.internalName) {
+    throw new Error('O nome interno é estável e não pode ser alterado depois da criação.');
+  }
+  const duplicate = await prisma.customFieldDefinition.findFirst({
+    where: { projectId, internalName, id: { not: definitionId } },
+  });
+  if (duplicate) throw new Error('Já existe um campo com este nome interno.');
+
+  const options = data.options === undefined ? parseFieldOptions(existing.options) : parseFieldOptions(data.options);
+  if (['SELECT', 'MULTI_SELECT'].includes(type) && options.length === 0) {
+    throw new Error('Campos de seleção precisam de pelo menos uma opção.');
+  }
+
+  const definition = await prisma.customFieldDefinition.update({
+    where: { id: definitionId },
+    data: {
+      name: data.name?.trim() || undefined,
+      internalName,
+      type,
+      options: options.length ? JSON.stringify(options) : null,
+      helpText: data.helpText === undefined ? undefined : data.helpText?.trim() || null,
+      defaultValue: data.defaultValue === undefined ? undefined : data.defaultValue || null,
+      validationRules: data.validationRules === undefined ? undefined : data.validationRules || null,
+      required: data.required,
+      isActive: data.isActive,
+    },
+  });
+  revalidatePath(`/project/${projectId}/settings`);
+  revalidatePath(`/project/${projectId}/leads`);
+  return definition;
+}
+
+export async function reorderCustomFieldDefinitions(projectId: string, orderedIds: string[]) {
+  await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+  const definitions = await prisma.customFieldDefinition.findMany({
+    where: { projectId, deletedAt: null },
+    select: { id: true },
+  });
+  const ids = new Set(definitions.map((definition) => definition.id));
+  if (orderedIds.length !== ids.size || new Set(orderedIds).size !== ids.size || orderedIds.some((id) => !ids.has(id))) {
+    throw new Error('A nova ordem precisa conter exatamente todos os campos deste projeto.');
+  }
+  await prisma.$transaction(
+    orderedIds.map((id, order) => prisma.customFieldDefinition.update({ where: { id }, data: { order } })),
+  );
+  revalidatePath(`/project/${projectId}/settings`);
+  return { success: true };
 }
 
 export async function deleteCustomFieldDefinition(projectId: string, definitionId: string) {
@@ -333,8 +494,9 @@ export async function deleteCustomFieldDefinition(projectId: string, definitionI
     throw new Error('Campo personalizado não encontrado.');
   }
 
-  await prisma.customFieldDefinition.delete({
+  await prisma.customFieldDefinition.update({
     where: { id: definitionId },
+    data: { isActive: false, deletedAt: new Date() },
   });
   revalidatePath(`/project/${projectId}/settings`);
   return { success: true };
@@ -351,8 +513,8 @@ export async function getLeadCustomFields(projectId: string, leadId: string) {
 
   // Busca todas as definições do projeto
   const definitions = await prisma.customFieldDefinition.findMany({
-    where: { projectId },
-    orderBy: { name: 'asc' },
+    where: { projectId, isActive: true, deletedAt: null },
+    orderBy: [{ order: 'asc' }, { name: 'asc' }],
   });
 
   // Busca os valores salvos para o lead
@@ -384,7 +546,23 @@ export async function updateLeadCustomFieldValues(
     throw new Error('Lead não encontrado.');
   }
 
-  const promises = Object.entries(fields).map(async ([fieldDefinitionId, value]) => {
+  const definitions = await prisma.customFieldDefinition.findMany({
+    where: { projectId, id: { in: Object.keys(fields) }, isActive: true, deletedAt: null },
+  });
+  if (definitions.length !== Object.keys(fields).length) throw new Error('Um ou mais campos são inválidos para este projeto.');
+  const definitionsById = new Map(definitions.map((definition) => [definition.id, definition]));
+
+  const promises = Object.entries(fields).map(async ([fieldDefinitionId, rawValue]) => {
+    const definition = definitionsById.get(fieldDefinitionId)!;
+    const value = normalizeCustomFieldValue(
+      definition.type as CustomFieldType,
+      rawValue,
+      parseFieldOptions(definition.options),
+      parseValidationRules(definition.validationRules),
+    );
+    if (definition.required && value === '') {
+      throw new Error(`O campo "${definition.name}" é obrigatório.`);
+    }
     // Busca se já existe um valor
     const existingValue = await prisma.customFieldValue.findFirst({
       where: { leadId, fieldDefinitionId },
@@ -411,6 +589,7 @@ export async function updateLeadCustomFieldValues(
   });
 
   await Promise.all(promises);
+  await dispatchLeadWebhooks(projectId, leadId, 'lead.updated');
   revalidatePath(`/project/${projectId}`);
   return { success: true };
 }
@@ -587,7 +766,7 @@ export async function createLead(
     include: { pipeline: true }
   });
 
-  if (!stage) {
+  if (!stage || stage.pipeline.projectId !== projectId) {
     throw new Error('Estágio inválido.');
   }
 
@@ -724,6 +903,7 @@ export async function createLead(
 
   revalidatePath(`/project/${projectId}`);
   revalidatePath(`/project/${projectId}/leads`);
+  await dispatchLeadWebhooks(projectId, lead.id, isNew ? 'lead.created' : 'lead.updated');
   return lead;
 }
 
@@ -785,8 +965,13 @@ export async function updateLead(
 
   let targetPipelineId = data.pipelineId;
   if (!targetPipelineId && data.stageId) {
-    const stage = await prisma.stage.findUnique({ where: { id: data.stageId } });
+    const stage = await prisma.stage.findFirst({ where: { id: data.stageId, pipeline: { projectId } } });
     if (stage) targetPipelineId = stage.pipelineId;
+  }
+
+  if (targetPipelineId) {
+    const pipeline = await prisma.pipeline.findFirst({ where: { id: targetPipelineId, projectId } });
+    if (!pipeline) throw new Error('Kanban inválido para este projeto.');
   }
 
   if (targetPipelineId) {
@@ -873,6 +1058,7 @@ export async function updateLead(
 
   revalidatePath(`/project/${projectId}`);
   revalidatePath(`/project/${projectId}/leads`);
+  await dispatchLeadWebhooks(projectId, leadId, data.stageId ? 'lead.stage_changed' : 'lead.updated');
   return updatedLead;
 }
 
@@ -892,7 +1078,9 @@ export async function moveLead(projectId: string, leadId: string, pipelineId: st
     include: { pipeline: true }
   });
 
-  if (!targetStage) throw new Error('Estágio de destino inválido.');
+  if (!targetStage || targetStage.pipeline.projectId !== projectId || targetStage.pipelineId !== pipelineId) {
+    throw new Error('Estágio de destino inválido.');
+  }
 
   const existingEntry = await prisma.pipelineEntry.findUnique({
     where: {
@@ -930,6 +1118,7 @@ export async function moveLead(projectId: string, leadId: string, pipelineId: st
   });
 
   revalidatePath(`/project/${projectId}`);
+  await dispatchLeadWebhooks(projectId, leadId, 'lead.stage_changed');
   return lead;
 }
 
@@ -1161,7 +1350,7 @@ export async function deleteActivity(projectId: string, activityId: string) {
 export async function getWebhookEndpoints(projectId: string) {
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
   return prisma.webhookEndpoint.findMany({
-    where: { projectId },
+    where: { projectId, deletedAt: null },
     orderBy: { createdAt: 'desc' },
     include: {
       origin: true,
@@ -1174,11 +1363,18 @@ export async function createWebhookEndpoint(
   data: {
     name: string;
     targetStageId: string;
-    originId?: string; // Vincula a uma origem (adendo)
+    originId?: string | null; // Vincula a uma origem (adendo)
     fieldMapping: string;
   }
 ) {
   await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+
+  const stage = await prisma.stage.findFirst({ where: { id: data.targetStageId, pipeline: { projectId } } });
+  if (!stage) throw new Error('Selecione uma etapa válida deste projeto.');
+  if (data.originId) {
+    const origin = await prisma.origin.findFirst({ where: { id: data.originId, projectId } });
+    if (!origin) throw new Error('Selecione uma origem válida deste projeto.');
+  }
 
   const token = crypto.randomBytes(32).toString('hex');
 
@@ -1190,11 +1386,171 @@ export async function createWebhookEndpoint(
       originId: data.originId || null,
       projectId,
       fieldMapping: data.fieldMapping,
+      direction: 'INCOMING',
     },
   });
 
   revalidatePath(`/project/${projectId}/settings`);
   return endpoint;
+}
+
+async function validateWebhookCustomSources(projectId: string, payloadFields: WebhookPayloadField[]) {
+  const sources = [...new Set(
+    payloadFields
+      .filter((field) => field.sourceType === 'CUSTOM' && field.source)
+      .map((field) => field.source!),
+  )];
+  if (sources.length === 0) return;
+  const definitions = await prisma.customFieldDefinition.findMany({
+    where: {
+      projectId,
+      isActive: true,
+      deletedAt: null,
+      OR: [{ id: { in: sources } }, { internalName: { in: sources } }],
+    },
+    select: { id: true, internalName: true },
+  });
+  const validSources = new Set(definitions.flatMap((definition) => [definition.id, definition.internalName]));
+  if (sources.some((source) => !validSources.has(source))) {
+    throw new Error('Um ou mais campos personalizados do payload não pertencem a este projeto.');
+  }
+}
+
+export async function createOutgoingWebhook(
+  projectId: string,
+  data: {
+    name: string;
+    url: string;
+    method: WebhookMethod;
+    events: WebhookEvent[];
+    payloadFields: WebhookPayloadField[];
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+  },
+) {
+  await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+  const name = data.name.trim();
+  if (!name) throw new Error('Informe o nome do webhook.');
+  const url = await assertSafeWebhookUrl(data.url);
+  if (!WEBHOOK_METHODS.includes(data.method)) throw new Error('Método HTTP inválido.');
+  if (data.events.length === 0 || data.events.some((event) => !WEBHOOK_EVENTS.includes(event))) {
+    throw new Error('Selecione pelo menos um evento válido.');
+  }
+  validatePayloadFields(data.payloadFields);
+  await validateWebhookCustomSources(projectId, data.payloadFields);
+  const timeoutMs = Math.min(Math.max(data.timeoutMs || 10000, 1000), 30000);
+
+  const endpoint = await prisma.webhookEndpoint.create({
+    data: {
+      name,
+      token: crypto.randomBytes(32).toString('hex'),
+      direction: 'OUTGOING',
+      url,
+      method: data.method,
+      events: JSON.stringify([...new Set(data.events)]),
+      payloadFields: JSON.stringify(data.payloadFields),
+      headersEncrypted: encryptWebhookHeaders(data.headers || {}),
+      timeoutMs,
+      projectId,
+    },
+  });
+  revalidatePath(`/project/${projectId}/settings`);
+  return endpoint;
+}
+
+export async function updateWebhookEndpoint(
+  projectId: string,
+  webhookId: string,
+  data: {
+    name?: string;
+    isActive?: boolean;
+    targetStageId?: string | null;
+    originId?: string | null;
+    fieldMapping?: string;
+    url?: string;
+    method?: WebhookMethod;
+    events?: WebhookEvent[];
+    payloadFields?: WebhookPayloadField[];
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+  },
+) {
+  await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+  const webhook = await prisma.webhookEndpoint.findFirst({ where: { id: webhookId, projectId, deletedAt: null } });
+  if (!webhook) throw new Error('Webhook não encontrado.');
+
+  if (data.method && !WEBHOOK_METHODS.includes(data.method)) throw new Error('Método HTTP inválido.');
+  if (data.events && (data.events.length === 0 || data.events.some((event) => !WEBHOOK_EVENTS.includes(event)))) {
+    throw new Error('Selecione pelo menos um evento válido.');
+  }
+  if (data.payloadFields) validatePayloadFields(data.payloadFields);
+  if (data.payloadFields) await validateWebhookCustomSources(projectId, data.payloadFields);
+  const url = data.url === undefined ? undefined : await assertSafeWebhookUrl(data.url);
+
+  if (webhook.direction === 'INCOMING' && data.targetStageId !== undefined && data.targetStageId !== null) {
+    const stage = await prisma.stage.findFirst({ where: { id: data.targetStageId, pipeline: { projectId } } });
+    if (!stage) throw new Error('Selecione uma etapa válida deste projeto.');
+  }
+  if (data.originId) {
+    const origin = await prisma.origin.findFirst({ where: { id: data.originId, projectId } });
+    if (!origin) throw new Error('Selecione uma origem válida deste projeto.');
+  }
+
+  const updated = await prisma.webhookEndpoint.update({
+    where: { id: webhookId },
+    data: {
+      name: data.name?.trim() || undefined,
+      isActive: data.isActive,
+      targetStageId: data.targetStageId,
+      originId: data.originId,
+      fieldMapping: data.fieldMapping,
+      url,
+      method: data.method,
+      events: data.events ? JSON.stringify([...new Set(data.events)]) : undefined,
+      payloadFields: data.payloadFields ? JSON.stringify(data.payloadFields) : undefined,
+      headersEncrypted: data.headers ? encryptWebhookHeaders(data.headers) : undefined,
+      timeoutMs: data.timeoutMs === undefined ? undefined : Math.min(Math.max(data.timeoutMs, 1000), 30000),
+    },
+  });
+  revalidatePath(`/project/${projectId}/settings`);
+  return updated;
+}
+
+export async function testOutgoingWebhook(projectId: string, webhookId: string) {
+  await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+  const webhook = await prisma.webhookEndpoint.findFirst({
+    where: { id: webhookId, projectId, direction: 'OUTGOING', deletedAt: null },
+  });
+  if (!webhook) throw new Error('Webhook de saída não encontrado.');
+  return deliverWebhook(webhook, 'webhook.test', {
+    event: 'webhook.test',
+    id: 'lead_example',
+    name: 'Lead de exemplo',
+    email: 'lead@example.com',
+    phone: '5511999999999',
+    company: 'Empresa Exemplo',
+    priority: 'MEDIA',
+    value: 0,
+    pipelineId: 'pipeline_example',
+    stageId: 'stage_example',
+    customFields: {},
+  });
+}
+
+export async function retryWebhookDelivery(projectId: string, logId: string) {
+  await requireProjectAccess(projectId, 'PROJECT_ADMIN');
+  const log = await prisma.webhookLog.findFirst({
+    where: { id: logId, webhook: { projectId, direction: 'OUTGOING', deletedAt: null } },
+    include: { webhook: true },
+  });
+  if (!log) throw new Error('Tentativa de webhook não encontrada.');
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(log.payload);
+  } catch {
+    throw new Error('O payload anterior não é um JSON válido.');
+  }
+  return deliverPreparedWebhook(log.webhook, log.event || 'retry', payload, log.attempt + 1);
 }
 
 export async function deleteWebhookEndpoint(projectId: string, webhookId: string) {
@@ -1205,8 +1561,9 @@ export async function deleteWebhookEndpoint(projectId: string, webhookId: string
     throw new Error('Webhook não encontrado.');
   }
 
-  await prisma.webhookEndpoint.delete({
+  await prisma.webhookEndpoint.update({
     where: { id: webhookId },
+    data: { isActive: false, deletedAt: new Date() },
   });
 
   revalidatePath(`/project/${projectId}/settings`);
@@ -1405,9 +1762,16 @@ export async function importLeadsAction(
   });
   const targetStage = targetPipeline?.stages.find(s => s.id === targetStageId);
 
-  if (!targetPipeline || !targetStage) {
+  if (!targetPipeline || targetPipeline.projectId !== projectId || !targetStage) {
     throw new Error('Funil ou estágio de destino inválido.');
   }
+
+  const importFieldIds = [...new Set(rows.flatMap((row) => Object.keys(row.customFields || {})))];
+  const importDefinitions = await prisma.customFieldDefinition.findMany({
+    where: { projectId, id: { in: importFieldIds }, isActive: true, deletedAt: null },
+  });
+  if (importDefinitions.length !== importFieldIds.length) throw new Error('A importação contém campos personalizados inválidos.');
+  const importDefinitionsById = new Map(importDefinitions.map((definition) => [definition.id, definition]));
 
   let successCount = 0;
   let failureCount = 0;
@@ -1497,10 +1861,6 @@ export async function importLeadsAction(
         }
       });
 
-      const origin = originId 
-        ? await prisma.origin.findUnique({ where: { id: originId } })
-        : null;
-
       if (!existingEntry) {
         await prisma.pipelineEntry.create({
           data: {
@@ -1553,6 +1913,13 @@ export async function importLeadsAction(
       if (row.customFields) {
         const customFieldPromises = Object.entries(row.customFields).map(async ([definitionId, value]) => {
           if (value && value.trim()) {
+            const definition = importDefinitionsById.get(definitionId)!;
+            const normalizedValue = normalizeCustomFieldValue(
+              definition.type as CustomFieldType,
+              value,
+              parseFieldOptions(definition.options),
+              parseValidationRules(definition.validationRules),
+            );
             const existingVal = await prisma.customFieldValue.findFirst({
               where: { leadId: lead.id, fieldDefinitionId: definitionId }
             });
@@ -1562,14 +1929,14 @@ export async function importLeadsAction(
                 data: {
                   leadId: lead.id,
                   fieldDefinitionId: definitionId,
-                  value: value.trim(),
+                  value: normalizedValue,
                 },
               });
             } else {
               if (!existingVal.value || !existingVal.value.trim()) {
                 return prisma.customFieldValue.update({
                   where: { id: existingVal.id },
-                  data: { value: value.trim() }
+                  data: { value: normalizedValue }
                 });
               }
             }
@@ -1961,5 +2328,3 @@ export async function resetPassword(token: string, newPassword: string) {
 
   return { success: true };
 }
-
-
