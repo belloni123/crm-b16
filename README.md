@@ -6,6 +6,7 @@ Aplicação oficial do CRM B16 em Next.js 16, Prisma e PostgreSQL. O produto man
 
 - [Auditoria e matriz funcional](docs/auditoria-crm-e-matriz.md)
 - [Campos personalizados, webhooks e Kanban](docs/campos-webhooks-kanban.md)
+- [Tratamento de erros e acesso negado](docs/tratamento-de-erros.md)
 - [Operação, migrations e rollback](docs/operacao-migrations-rollback.md)
 - [Evidências de QA da entrega de 2026-09-01](docs/qa-release-2026-09-01.md)
 
@@ -260,5 +261,4 @@ Adicionamos aprimoramentos estéticos modernos e um sistema completo de redefini
 *   **Transição de Card**: Na tela de login, clicando em "Esqueci minha senha", a caixa de login realiza uma transição suave para o formulário de e-mail de recuperação.
 *   **Simulador de E-mail de Desenvolvimento**: Como não há SMTP ativo localmente, a tela de sucesso exibe uma caixa destacada contendo o link de depuração para testes locais: `http://localhost:3000/reset-password?token=...`.
 *   **Página Pública de Redefinição (`/reset-password`)**: Rota segura que extrai o token da URL, valida a expiração de 1 hora no PostgreSQL, valida a força da senha (mínimo de 6 caracteres), gera o hash `bcryptjs` no servidor e atualiza o usuário no banco de dados.
-
 

@@ -39,6 +39,17 @@ Depois da primeira publicação, a configuração de entrada ainda expunha apena
 - Smoke HTTP: `/api/health` 200, `/` 200, `/project` 307 para login, API sem chave 401 e token de webhook sintético inválido 404.
 - Smoke visual não autenticado: tela de login renderizada no domínio de produção. O CRUD visual autenticado permanece dependente da sessão do usuário no Chrome, que não estava disponível para automação nesta rodada.
 
+## Correção de experiência — páginas de erro
+
+- Adicionadas telas consistentes para acesso negado (403), recurso inexistente (404), erro de rota (500) e falha global.
+- Acesso negado a projeto e painel administrativo deixou de cair na exceção técnica ou no login com parâmetro genérico.
+- Mensagens de produção não expõem detalhes internos; a tela 500 mostra somente o `digest` seguro quando disponível.
+- O botão de nova tentativa usa a recuperação oficial da error boundary do Next.js.
+- Corrigido o aviso de hidratação causado pela aplicação antecipada do tema em `data-theme`.
+- QA visual local: variações de projeto, superadministrador e 404 renderizadas sem overlay de erro.
+- QA HTTP local: página de acesso negado 200, rota inexistente 404 e rota protegida sem sessão 307 para login.
+- Gates finais locais: 16/16 testes, TypeScript e build de produção aprovados, 12/12 páginas estáticas, auditoria com 0 vulnerabilidades e ESLint com 0 erros/37 avisos preexistentes fora das telas novas.
+
 ## Escopo
 
 - evolução segura de campos personalizados;
