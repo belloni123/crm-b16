@@ -27,5 +27,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV NODE_ENV=production
 
-# Comando para iniciar (sincroniza o banco de dados antes de subir o servidor)
-CMD ["sh", "-c", "npx prisma db push && node prisma/seed.js && npm run start"]
+# Aplica somente migrations versionadas. Seed nunca roda automaticamente em produção.
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]

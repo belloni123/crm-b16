@@ -1,0 +1,12 @@
+.git
+.github
+.next
+node_modules
+.env*
+scratch
+coverage
+*.log
+*.db
+*.sqlite
+*.dump
+docs

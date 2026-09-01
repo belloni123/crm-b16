@@ -8,22 +8,22 @@ generator client {
 }
 
 model User {
-  id            String       @id @default(uuid())
-  name          String?
-  email         String       @unique
-  passwordHash  String
-  role          String       @default("USER") // "SUPERADMIN" or "USER"
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  resetToken        String?      @unique
-  resetTokenExpires DateTime?
-  lgpdAccepted      Boolean      @default(false)
-  lgpdAcceptedAt    DateTime?
-  memberships       Membership[]
-  activities        Activity[]
-  assignedLeads     Lead[]       @relation("LeadAssignment")
+  id                   String                @id @default(uuid())
+  name                 String?
+  email                String                @unique
+  passwordHash         String
+  role                 String                @default("USER") // "SUPERADMIN" or "USER"
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  resetToken           String?               @unique
+  resetTokenExpires    DateTime?
+  lgpdAccepted         Boolean               @default(false)
+  lgpdAcceptedAt       DateTime?
+  memberships          Membership[]
+  activities           Activity[]
+  assignedLeads        Lead[]                @relation("LeadAssignment")
   calendarIntegrations CalendarIntegration[]
-  tasks             Task[]
+  tasks                Task[]
 }
 
 model Project {
@@ -49,13 +49,13 @@ model Project {
 }
 
 model Membership {
-  id                     String   @id @default(uuid())
-  role                   String   @default("MEMBER") // "PROJECT_ADMIN" or "MEMBER"
+  id                     String  @id @default(uuid())
+  role                   String  @default("MEMBER") // "PROJECT_ADMIN" or "MEMBER"
   userId                 String
   projectId              String
-  isDesignatedCommercial Boolean  @default(false)
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project                Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  isDesignatedCommercial Boolean @default(false)
+  user                   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project                Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([userId, projectId])
 }
@@ -105,7 +105,7 @@ model Lead {
   email             String?
   phone             String?
   company           String?
-  priority          String             @default("MEDIA")  // "BAIXA", "MEDIA", "ALTA"
+  priority          String             @default("MEDIA") // "BAIXA", "MEDIA", "ALTA"
   projectId         String
   originId          String?
   assignedUserId    String?
@@ -148,15 +148,28 @@ model PipelineEntry {
 }
 
 model CustomFieldDefinition {
-  id         String             @id @default(uuid())
-  name       String
-  type       String             // "TEXT", "NUMBER", "SELECT"
-  entityType String             @default("LEAD") // "LEAD" or "OPPORTUNITY"
-  options    String?            // JSON string of options for SELECT
-  projectId  String
-  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  values     CustomFieldValue[]
-  formFields FormField[]
+  id              String             @id @default(uuid())
+  name            String
+  internalName    String
+  type            String // TEXT, LONG_TEXT, NUMBER, CURRENCY, DATE, DATETIME, PHONE, EMAIL, URL, SELECT, MULTI_SELECT, CHECKBOX, BOOLEAN
+  entityType      String             @default("LEAD") // "LEAD" or "OPPORTUNITY"
+  options         String? // JSON array of configurable options
+  helpText        String?
+  defaultValue    String?
+  validationRules String? // JSON object with validation rules
+  required        Boolean            @default(false)
+  isActive        Boolean            @default(true)
+  order           Int                @default(0)
+  deletedAt       DateTime?
+  projectId       String
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  values          CustomFieldValue[]
+  formFields      FormField[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([projectId, internalName])
+  @@index([projectId, isActive, order])
 }
 
 model CustomFieldValue {
@@ -166,33 +179,36 @@ model CustomFieldValue {
   leadId            String
   lead              Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
   value             String
+
+  @@unique([fieldDefinitionId, leadId])
+  @@index([leadId])
 }
 
 model Tag {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   name      String
-  color     String   @default("#9FE870")
+  color     String  @default("#9FE870")
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  leads     Lead[]   @relation("LeadToTag")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  leads     Lead[]  @relation("LeadToTag")
 }
 
 model Task {
-  id          String    @id @default(uuid())
-  title       String
-  description String?
-  dueDate     DateTime?
-  status      String    @default("PENDING") // "PENDING", "IN_PROGRESS", "COMPLETED"
-  leadId      String?
-  projectId   String
-  userId      String?
-  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String    @id @default(uuid())
+  title            String
+  description      String?
+  dueDate          DateTime?
+  status           String    @default("PENDING") // "PENDING", "IN_PROGRESS", "COMPLETED"
+  leadId           String?
+  projectId        String
+  userId           String?
+  user             User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   googleEventId    String?
   microsoftEventId String?
-  lead        Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  lead             Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model Activity {
@@ -207,17 +223,29 @@ model Activity {
 }
 
 model WebhookEndpoint {
-  id            String       @id @default(uuid())
-  name          String
-  token         String       @unique
-  targetStageId String
-  projectId     String
-  originId      String?
-  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  origin        Origin?      @relation(fields: [originId], references: [id], onDelete: SetNull)
-  fieldMapping  String       @default("{}") // JSON string of field mappings
-  webhookLogs   WebhookLog[]
-  createdAt     DateTime     @default(now())
+  id               String       @id @default(uuid())
+  name             String
+  token            String       @unique
+  direction        String       @default("INCOMING") // INCOMING or OUTGOING
+  url              String?
+  method           String       @default("POST")
+  isActive         Boolean      @default(true)
+  events           String       @default("[]") // JSON array of event names
+  payloadFields    String       @default("[]") // Ordered JSON payload mapping
+  headersEncrypted String?
+  timeoutMs        Int          @default(10000)
+  targetStageId    String?
+  projectId        String
+  originId         String?
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  origin           Origin?      @relation(fields: [originId], references: [id], onDelete: SetNull)
+  fieldMapping     String       @default("{}") // Legacy incoming field mappings
+  webhookLogs      WebhookLog[]
+  deletedAt        DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([projectId, direction, isActive])
 }
 
 model WebhookLog {
@@ -227,25 +255,32 @@ model WebhookLog {
   payload      String
   status       String          @default("SUCCESS") // "SUCCESS" or "ERROR"
   errorDetails String?
+  event        String?
+  statusCode   Int?
+  responseBody String?
+  attempt      Int             @default(1)
+  durationMs   Int?
   createdAt    DateTime        @default(now())
+
+  @@index([webhookId, createdAt])
 }
 
 model WhatsAppInstance {
-  id           String         @id @default(uuid())
-  name         String
-  instanceName String         @unique
-  token        String?
-  status       String         @default("DISCONNECTED") // "CONNECTED", "DISCONNECTED"
-  type         String         @default("WHATSAPP") // Preparado para canais futuros
-  projectId    String
-  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id            String         @id @default(uuid())
+  name          String
+  instanceName  String         @unique
+  token         String?
+  status        String         @default("DISCONNECTED") // "CONNECTED", "DISCONNECTED"
+  type          String         @default("WHATSAPP") // Preparado para canais futuros
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   conversations Conversation[]
-  createdAt    DateTime       @default(now())
+  createdAt     DateTime       @default(now())
 }
 
 model Conversation {
   id            String           @id @default(uuid())
-  whatsappId    String           // phone number
+  whatsappId    String // phone number
   name          String
   lastMessageAt DateTime         @default(now())
   leadId        String?
@@ -261,10 +296,10 @@ model Message {
   id             String       @id @default(uuid())
   remoteId       String?
   content        String
-  direction      String       // "INBOUND" or "OUTBOUND"
+  direction      String // "INBOUND" or "OUTBOUND"
   status         String       @default("SENT") // "SENT", "DELIVERED", "READ"
   messageType    String       @default("TEXT") // "TEXT", "IMAGE", "DOCUMENT", "AUDIO"
-  mediaUrl       String?      // URL para arquivos de mídia
+  mediaUrl       String? // URL para arquivos de mídia
   senderName     String?
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -295,8 +330,8 @@ model FormField {
   id                      String                 @id @default(uuid())
   formId                  String
   form                    Form                   @relation(fields: [formId], references: [id], onDelete: Cascade)
-  type                    String                 // "SYSTEM" or "CUSTOM"
-  fieldName               String                 // "name", "email", "phone" for SYSTEM
+  type                    String // "SYSTEM" or "CUSTOM"
+  fieldName               String // "name", "email", "phone" for SYSTEM
   customFieldDefinitionId String?
   customFieldDefinition   CustomFieldDefinition? @relation(fields: [customFieldDefinitionId], references: [id], onDelete: SetNull)
   label                   String
@@ -305,16 +340,16 @@ model FormField {
 }
 
 model CalendarIntegration {
-  id           String   @id @default(uuid())
-  provider     String   // "GOOGLE" or "MICROSOFT"
+  id           String    @id @default(uuid())
+  provider     String // "GOOGLE" or "MICROSOFT"
   accessToken  String
   refreshToken String?
   expiresAt    DateTime?
   email        String?
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([userId, provider])
 }
