@@ -93,7 +93,7 @@ test("outbox recupera crashes, evita duplicatas e aplica retry/DLQ sob concorrê
     // Na tentativa máxima, a referência mínima vai para a DLQ real, sem payload do evento.
     const maxAttempts = await createEvent("max-attempts", { attempts: 1, maxAttempts: 2 });
     const failTargetOnly = (name: QueueName) => {
-      if (name === "provider-events") return unavailableFactory(name);
+      if (name === "provider-events") return unavailableFactory();
       const queue = createFoundationQueue(name);
       return {
         add: (jobName: string, data: Record<string, unknown>, options: { jobId: string }) => queue.add(jobName, data, options),

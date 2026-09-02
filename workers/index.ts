@@ -1,14 +1,14 @@
 import { Worker } from "bullmq";
 import { queuePrefix, validateServiceEnvironment } from "@/lib/env";
 import { structuredLog } from "@/lib/observability";
-import { createRedisConnection } from "@/lib/queues/connection";
+import { createRedisConnection, redisConnectionOptions } from "@/lib/queues/connection";
 import { prisma } from "@/lib/prisma";
 import { startHealthServer, startServiceHeartbeat } from "@/lib/process-health";
 import { outboundDecision } from "@/lib/outbound-policy";
 
 validateServiceEnvironment("worker");
 const redis = createRedisConnection();
-const workerOptions = () => ({ prefix: queuePrefix(), connection: createRedisConnection(), concurrency: 2 });
+const workerOptions = () => ({ prefix: queuePrefix(), connection: redisConnectionOptions(), concurrency: 2 });
 const workers = [
   new Worker("provider-events", async (job) => {
     if (!job.data.outboxEventId) throw new Error("MISSING_OUTBOX_EVENT_ID");
