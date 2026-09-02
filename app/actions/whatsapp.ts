@@ -5,12 +5,14 @@ import { requireProjectAccess } from '@/lib/security';
 import { revalidatePath } from 'next/cache';
 import { getPhoneVariants } from '@/lib/utils';
 import crypto from 'crypto';
+import { outboundDecision } from '@/lib/outbound-policy';
 
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
 // Função auxiliar para garantir que o webhook está configurado corretamente na Evolution API
 async function ensureWebhookConfigured(instanceName: string) {
+  if (!outboundDecision('EVOLUTION', 'configure-webhook').allowed) return false;
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) return;
   
   try {
@@ -81,7 +83,7 @@ export async function getWhatsAppInstances(projectId: string) {
   });
 
   // Sincroniza em tempo real o status com a Evolution API se estiver configurado
-  if (EVOLUTION_API_URL && EVOLUTION_API_KEY) {
+  if (EVOLUTION_API_URL && EVOLUTION_API_KEY && outboundDecision('EVOLUTION', 'sync-instance-status').allowed) {
     try {
       const updatedInstances = await Promise.all(
         instances.map(async (inst) => {
@@ -146,7 +148,7 @@ export async function createWhatsAppInstance(projectId: string, name: string, ty
   });
 
   // 2. Tenta registrar a instância na Evolution API
-  if (EVOLUTION_API_URL && EVOLUTION_API_KEY && type === 'WHATSAPP') {
+  if (EVOLUTION_API_URL && EVOLUTION_API_KEY && type === 'WHATSAPP' && outboundDecision('EVOLUTION', 'create-instance').allowed) {
     try {
       const baseUrl = process.env.NEXTAUTH_URL || 'https://crm.agenciab16.com.br';
       
@@ -198,6 +200,9 @@ export async function getQRCode(projectId: string, instanceId: string) {
     throw new Error('Instância não encontrada.');
   }
 
+  const outbound = outboundDecision('EVOLUTION', 'connect-instance');
+  if (!outbound.allowed) return { success: false, blocked: true, message: outbound.reason };
+
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
     return { success: false, message: 'Evolution API não configurada no ambiente.' };
   }
@@ -246,7 +251,7 @@ export async function deleteWhatsAppInstance(projectId: string, instanceId: stri
   }
 
   // Deleta da Evolution API se for WhatsApp
-  if (EVOLUTION_API_URL && EVOLUTION_API_KEY && instance.type === 'WHATSAPP') {
+  if (EVOLUTION_API_URL && EVOLUTION_API_KEY && instance.type === 'WHATSAPP' && outboundDecision('EVOLUTION', 'delete-instance').allowed) {
     try {
       await fetch(`${EVOLUTION_API_URL}/instance/delete/${instance.instanceName}`, {
         method: 'DELETE',
@@ -320,6 +325,9 @@ export async function sendWhatsAppMessage(
   mediaUrl: string | null = null
 ) {
   await requireProjectAccess(projectId);
+
+  const outbound = outboundDecision('EVOLUTION', messageType === 'TEXT' ? 'send-text' : 'send-media');
+  if (!outbound.allowed) throw new Error(outbound.reason);
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -533,4 +541,3 @@ export async function startWhatsAppConversation(projectId: string, leadId: strin
 
   return { success: true, conversationId: conversation.id };
 }
-

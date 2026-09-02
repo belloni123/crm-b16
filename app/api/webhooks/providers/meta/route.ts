@@ -1,7 +1,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { recordProviderEvent } from "@/lib/channels/events";
-import { allowWebhookRequest, correlationId, foundationEnabled, readRawBody, verifyHmacSha256 } from "@/lib/channels/webhook-gateway";
+import { allowWebhookRequest, clientOrigin, correlationId, foundationEnabled, parseWebhookJson, readRawBody, verifyHmacSha256 } from "@/lib/channels/webhook-gateway";
+import { createRedisConnection } from "@/lib/queues/connection";
 
 export const runtime = "nodejs";
 
@@ -32,28 +33,38 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const correlation = correlationId(request);
-  const client = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
-  if (!allowWebhookRequest(`meta:${client}`)) return Response.json({ error: "RATE_LIMITED", correlation }, { status: 429 });
+  const redis = createRedisConnection();
   try {
+    const originLimit = await allowWebhookRequest(redis, "meta", "origin", clientOrigin(request), Number(process.env.WEBHOOK_RATE_LIMIT_ORIGIN || 120));
+    if (!originLimit.allowed) return Response.json({ error: originLimit.code, correlation }, { status: originLimit.code === "RATE_LIMITED" ? 429 : 503, headers: { "retry-after": String(originLimit.retryAfterSeconds) } });
     const raw = await readRawBody(request);
     if (!verifyHmacSha256(raw, request.headers.get("x-hub-signature-256"), process.env.META_APP_SECRET)) {
       return Response.json({ error: "INVALID_SIGNATURE", correlation }, { status: 401 });
     }
-    const body = JSON.parse(raw.toString("utf8")) as MetaPayload;
-    const entry = body.entry?.[0];
-    const change = entry?.changes?.[0];
-    const phoneNumberId = change?.value?.metadata?.phone_number_id;
-    const connection = await prisma.channelConnection.findFirst({
-      where: { provider: { in: ["META_WHATSAPP", "META_INSTAGRAM"] }, isActive: true, OR: [{ externalPhoneNumberId: phoneNumberId }, { externalPageId: entry?.id }, { externalInstagramAccountId: entry?.id }] },
-    });
-    if (!connection || !(await foundationEnabled(connection.projectId))) return Response.json({ status: "DISABLED", correlation }, { status: 202 });
-    const externalKey = change?.value?.id || request.headers.get("x-meta-event-id") || `sha256:${createHashForKey(raw)}`;
-    const result = await recordProviderEvent({ connectionId: connection.id, externalEventKey: externalKey, eventType: change?.field || "unknown", rawBody: raw.toString("utf8") });
-    return Response.json({ status: result.duplicate ? "DUPLICATE" : "ACCEPTED", correlation }, { status: 202 });
+    const body = parseWebhookJson<MetaPayload>(raw);
+    let accepted = 0;
+    let duplicates = 0;
+    for (const [entryIndex, entry] of (body.entry || []).entries()) {
+      for (const [changeIndex, change] of (entry.changes || []).entries()) {
+        const phoneNumberId = change.value?.metadata?.phone_number_id;
+        const connection = await prisma.channelConnection.findFirst({
+          where: { provider: { in: ["META_WHATSAPP", "META_INSTAGRAM"] }, isActive: true, OR: [{ externalPhoneNumberId: phoneNumberId }, { externalPageId: entry.id }, { externalInstagramAccountId: entry.id }] },
+        });
+        if (!connection || !(await foundationEnabled(connection.projectId))) continue;
+        const connectionLimit = await allowWebhookRequest(redis, "meta", "connection", connection.id, Number(process.env.WEBHOOK_RATE_LIMIT_CONNECTION || 600));
+        if (!connectionLimit.allowed) return Response.json({ error: connectionLimit.code, correlation }, { status: connectionLimit.code === "RATE_LIMITED" ? 429 : 503, headers: { "retry-after": String(connectionLimit.retryAfterSeconds) } });
+        const normalized = Buffer.from(JSON.stringify({ entryId: entry.id, change }));
+        const externalKey = change.value?.id || request.headers.get("x-meta-event-id") || `sha256:${createHashForKey(normalized)}:${entryIndex}:${changeIndex}`;
+        const result = await recordProviderEvent({ connectionId: connection.id, externalEventKey: externalKey, eventType: change.field || "unknown", rawBody: normalized.toString("utf8") });
+        if (result.duplicate) duplicates += 1;
+        else accepted += 1;
+      }
+    }
+    return Response.json({ status: accepted ? "ACCEPTED" : duplicates ? "DUPLICATE" : "DISABLED", accepted, duplicates, correlation }, { status: 202 });
   } catch (error) {
     const code = error instanceof Error ? error.message : "INVALID_REQUEST";
     return Response.json({ error: code === "BODY_TOO_LARGE" ? code : "INVALID_REQUEST", correlation }, { status: code === "BODY_TOO_LARGE" ? 413 : 400 });
-  }
+  } finally { await redis.quit(); }
 }
 
 function createHashForKey(raw: Buffer) {

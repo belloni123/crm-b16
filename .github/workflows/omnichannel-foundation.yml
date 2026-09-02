@@ -1,0 +1,78 @@
+name: Omnichannel foundation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - feat/omnichannel-foundation-hardening
+      - feat/evolution-compatibility-layer
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: crm_b16_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d crm_b16_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/crm_b16_ci?schema=public
+      REDIS_URL: redis://127.0.0.1:6379
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+      DB_SAFETY_SCOPE: isolated
+      DEPLOYMENT_ENV: ci
+      QUEUE_PREFIX: crm-b16-ci
+      OUTBOUND_INTEGRATIONS_DISABLED: "true"
+      OBJECT_STORAGE_ENABLED: "false"
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXTAUTH_SECRET: synthetic-ci-nextauth-secret-without-production-access
+      WEBHOOK_ENCRYPTION_KEY: synthetic-ci-webhook-encryption-key
+      CHANNEL_CREDENTIALS_ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      CHANNEL_CREDENTIALS_KEY_ID: channel-ci-v1
+      PROVIDER_EVENT_ENCRYPTION_KEY: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      PROVIDER_EVENT_KEY_ID: event-ci-v1
+      META_WEBHOOK_VERIFY_TOKEN: synthetic-ci-verify-token
+      META_APP_SECRET: synthetic-ci-app-secret
+      EVOLUTION_FOUNDATION_WEBHOOK_SECRET: synthetic-ci-evolution-secret
+      HEALTH_PORT: "3001"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npx tsx scripts/check-additive-migrations.ts
+      - run: npx prisma validate
+      - run: npx prisma migrate deploy
+      - run: npx prisma migrate deploy | tee /tmp/second-migrate.log
+      - run: grep -q "No pending migrations" /tmp/second-migrate.log
+      - run: ./scripts/verify-migration-history.sh
+      - run: npm test
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run build
+      - name: Worker and scheduler readiness
+        run: |
+          HEALTH_PORT=3001 npm run worker >/tmp/worker.log 2>&1 &
+          worker_pid=$!
+          HEALTH_PORT=3002 npm run scheduler >/tmp/scheduler.log 2>&1 &
+          scheduler_pid=$!
+          trap 'kill "$worker_pid" "$scheduler_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 20); do
+            curl --fail --silent http://127.0.0.1:3001/ready >/dev/null && curl --fail --silent http://127.0.0.1:3002/ready >/dev/null && exit 0
+            sleep 1
+          done
+          exit 1

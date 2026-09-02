@@ -1,6 +1,9 @@
 import nodemailer from 'nodemailer';
+import { outboundDecision } from '@/lib/outbound-policy';
 
 export async function sendPasswordResetEmail(email: string, resetUrl: string) {
+  const outbound = outboundDecision('RESEND', 'password-reset-email');
+  if (!outbound.allowed) { outboundDecision('SMTP', 'password-reset-email'); return { success: false, blocked: true, reason: outbound.reason }; }
   const mailSubject = 'Redefinição de Senha — CRM b16';
   const mailHtml = `
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 30px 20px; background-color: #050505; border-radius: 16px; border: 1px solid rgba(212, 168, 67, 0.1); color: #ffffff; text-align: center;">
@@ -99,6 +102,8 @@ export async function sendPasswordResetEmail(email: string, resetUrl: string) {
 }
 
 export async function sendProjectInvitationEmail(email: string, userName: string | null, projectName: string, projectUrl: string) {
+  const outbound = outboundDecision('RESEND', 'project-invitation-email');
+  if (!outbound.allowed) { outboundDecision('SMTP', 'project-invitation-email'); return { success: false, blocked: true, reason: outbound.reason }; }
   const mailSubject = `Convite de Projeto: ${projectName} — CRM b16`;
   const displayName = userName || email;
   const mailHtml = `

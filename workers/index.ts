@@ -1,26 +1,37 @@
 import { Worker } from "bullmq";
-import { assertOutboundDisabled } from "@/lib/env";
+import { queuePrefix, validateServiceEnvironment } from "@/lib/env";
 import { structuredLog } from "@/lib/observability";
 import { createRedisConnection } from "@/lib/queues/connection";
 import { prisma } from "@/lib/prisma";
-import { startHealthServer } from "@/lib/process-health";
+import { startHealthServer, startServiceHeartbeat } from "@/lib/process-health";
+import { outboundDecision } from "@/lib/outbound-policy";
 
-assertOutboundDisabled();
+validateServiceEnvironment("worker");
 const redis = createRedisConnection();
-const workers = ["provider-events", "outbox-dispatch", "message-dispatch", "dead-letter"].map((queue) =>
-  new Worker(queue, async (job) => {
-    if (queue === "message-dispatch") {
-      structuredLog("warn", "outbound.blocked", { jobId: job.id, reason: "OUTBOUND_INTEGRATIONS_DISABLED" });
-      return { status: "BLOCKED" };
-    }
-    structuredLog("info", "foundation.job.noop", { queue, jobId: job.id });
-    return { status: "NOOP" };
-  }, { connection: createRedisConnection(), concurrency: 2 }),
-);
+const workerOptions = () => ({ prefix: queuePrefix(), connection: createRedisConnection(), concurrency: 2 });
+const workers = [
+  new Worker("provider-events", async (job) => {
+    if (!job.data.outboxEventId) throw new Error("MISSING_OUTBOX_EVENT_ID");
+    if (!["PROVIDER_EVENT_RECEIVED", "EVOLUTION_DUAL_WRITE"].includes(job.name)) throw new Error("UNKNOWN_PROVIDER_EVENT_JOB");
+    return { status: "RECORDED" };
+  }, workerOptions()),
+  new Worker("outbox-dispatch", async () => { throw new Error("DEPRECATED_OUTBOX_DISPATCH_QUEUE"); }, workerOptions()),
+  new Worker("message-dispatch", async () => {
+    const decision = outboundDecision("EVOLUTION", "message-dispatch");
+    return { status: decision.allowed ? "READY" : "BLOCKED" };
+  }, workerOptions()),
+  new Worker("dead-letter", async (job) => {
+    if (!job.data.outboxEventId) throw new Error("MISSING_OUTBOX_EVENT_ID");
+    structuredLog("error", "outbox.dead-letter.received", { outboxEventId: job.data.outboxEventId, errorCode: "DEAD_LETTER" });
+    return { status: "RECORDED" };
+  }, workerOptions()),
+];
 const health = startHealthServer(Number(process.env.HEALTH_PORT || 3001), "worker", redis);
+const stopHeartbeat = startServiceHeartbeat("worker", redis);
 
 async function shutdown(signal: string) {
   structuredLog("info", "worker.shutdown", { signal });
+  stopHeartbeat();
   health.close();
   await Promise.all(workers.map((worker) => worker.close()));
   await redis.quit();

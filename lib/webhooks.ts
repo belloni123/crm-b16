@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { isIP } from 'net';
 import { lookup } from 'dns/promises';
 import { prisma } from './prisma';
+import { outboundDecision } from './outbound-policy';
 
 export const WEBHOOK_EVENTS = ['lead.created', 'lead.updated', 'lead.stage_changed'] as const;
 export const WEBHOOK_METHODS = ['POST', 'PUT', 'PATCH'] as const;
@@ -223,6 +224,11 @@ export async function deliverPreparedWebhook(
   attempt = 1,
 ) {
   const startedAt = Date.now();
+  const decision = outboundDecision('OUTGOING_WEBHOOK', 'deliver');
+  if (!decision.allowed) {
+    await prisma.webhookLog.create({ data: { webhookId: webhook.id, event, payload: '{}', status: 'ERROR', errorDetails: decision.reason, attempt, durationMs: 0 } });
+    return { success: false, blocked: true, statusCode: null, responseBody: decision.reason };
+  }
   try {
     if (!webhook.url) throw new Error('Webhook sem URL configurada.');
     const url = await assertSafeWebhookUrl(webhook.url);

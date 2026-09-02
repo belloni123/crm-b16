@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getMicrosoftRedirectUri } from '@/lib/calendar';
+import { outboundDecision } from '@/lib/outbound-policy';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  const outbound = outboundDecision('MICROSOFT_CALENDAR', 'oauth-start');
+  if (!outbound.allowed) return NextResponse.json({ error: outbound.reason }, { status: 503 });
   const session = await getServerSession(authOptions);
   if (!session || !session.user) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });

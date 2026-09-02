@@ -18,6 +18,7 @@ test("credenciais usam AES-256-GCM, nonce único e rotação", () => {
   assert.notEqual(a, b);
   assert.deepEqual(decryptChannelCredentials(a), { token: "synthetic" });
   process.env.CHANNEL_CREDENTIALS_PREVIOUS_KEY = first;
+  process.env.CHANNEL_CREDENTIALS_PREVIOUS_KEY_ID = "v1";
   process.env.CHANNEL_CREDENTIALS_KEY_ID = "v2";
   process.env.CHANNEL_CREDENTIALS_ENCRYPTION_KEY = second;
   assert.deepEqual(decryptChannelCredentials(a), { token: "synthetic" });

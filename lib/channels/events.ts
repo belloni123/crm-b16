@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { encryptChannelCredentials } from "./credentials";
+import { encryptProviderEventPayload } from "./provider-event-vault";
 
 export type RecordProviderEventInput = {
   connectionId: string;
@@ -15,7 +15,7 @@ export async function recordProviderEvent(input: RecordProviderEventInput) {
   const connection = await prisma.channelConnection.findUnique({ where: { id: input.connectionId } });
   if (!connection?.isActive) throw new Error("CHANNEL_CONNECTION_NOT_ACTIVE");
   const payloadHash = createHash("sha256").update(input.rawBody).digest("hex");
-  const encrypted = encryptChannelCredentials(input.rawBody);
+  const encrypted = encryptProviderEventPayload(input.rawBody, { projectId: connection.projectId, connectionId: connection.id });
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -28,6 +28,7 @@ export async function recordProviderEvent(input: RecordProviderEventInput) {
           eventType: input.eventType,
           payloadHash,
           payloadEncrypted: encrypted,
+          retentionUntil: new Date(Date.now() + Number(process.env.PROVIDER_EVENT_RETENTION_DAYS || 30) * 86_400_000),
           occurredAt: input.occurredAt,
         },
       });
@@ -37,6 +38,7 @@ export async function recordProviderEvent(input: RecordProviderEventInput) {
           aggregateType: "ProviderEvent",
           aggregateId: event.id,
           eventType: "PROVIDER_EVENT_RECEIVED",
+          targetQueue: "provider-events",
           payload: JSON.stringify({ providerEventId: event.id, correlationId: randomUUID() }),
           idempotencyKey: `provider-event:${connection.id}:${input.externalEventKey}`,
         },

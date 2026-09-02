@@ -28,4 +28,4 @@ ENV PORT=3000
 ENV NODE_ENV=production
 
 # Aplica somente migrations versionadas. Seed nunca roda automaticamente em produção.
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:validated"]

@@ -3,10 +3,13 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getGoogleRedirectUri } from '@/lib/calendar';
+import { outboundDecision } from '@/lib/outbound-policy';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  const outbound = outboundDecision('GOOGLE_CALENDAR', 'oauth-callback');
+  if (!outbound.allowed) return NextResponse.json({ error: outbound.reason }, { status: 503 });
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const projectId = searchParams.get('state') || '';

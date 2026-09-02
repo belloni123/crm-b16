@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:validated": "tsx scripts/validate-env.ts web && next start",
     "worker": "tsx workers/index.ts",
     "scheduler": "tsx scheduler/index.ts",
     "seed:staging": "tsx prisma/seed-staging.ts",

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { assertOutboundAllowed, outboundDecision } from '@/lib/outbound-policy';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -24,6 +25,7 @@ export function getMicrosoftRedirectUri() {
  * Atualiza o token de acesso (accessToken) do Google ou Microsoft se estiver expirado
  */
 export async function refreshIntegrationTokenIfNeeded(userId: string, provider: 'GOOGLE' | 'MICROSOFT') {
+  if (!outboundDecision(provider === 'GOOGLE' ? 'GOOGLE_CALENDAR' : 'MICROSOFT_CALENDAR', 'refresh-token').allowed) return null;
   const integration = await prisma.calendarIntegration.findUnique({
     where: {
       userId_provider: { userId, provider },
@@ -136,6 +138,7 @@ async function callGoogleCalendarApi(
   method: 'POST' | 'PUT' | 'DELETE',
   body?: any
 ) {
+  assertOutboundAllowed('GOOGLE_CALENDAR', 'calendar-api');
   const url = `https://www.googleapis.com/calendar/v3${endpoint}`;
   const headers: HeadersInit = {
     Authorization: `Bearer ${accessToken}`,
@@ -168,6 +171,7 @@ async function callMicrosoftCalendarApi(
   method: 'POST' | 'PATCH' | 'DELETE',
   body?: any
 ) {
+  assertOutboundAllowed('MICROSOFT_CALENDAR', 'calendar-api');
   const url = `https://graph.microsoft.com/v1.0${endpoint}`;
   const headers: HeadersInit = {
     Authorization: `Bearer ${accessToken}`,
@@ -206,6 +210,7 @@ export async function syncTaskToGoogleCalendar(
   },
   action: 'CREATE' | 'UPDATE' | 'DELETE'
 ) {
+  if (!outboundDecision('GOOGLE_CALENDAR', 'sync-task').allowed) return;
   const token = await refreshIntegrationTokenIfNeeded(userId, 'GOOGLE');
   if (!token) return;
 
@@ -277,6 +282,7 @@ export async function syncTaskToMicrosoftCalendar(
   },
   action: 'CREATE' | 'UPDATE' | 'DELETE'
 ) {
+  if (!outboundDecision('MICROSOFT_CALENDAR', 'sync-task').allowed) return;
   const token = await refreshIntegrationTokenIfNeeded(userId, 'MICROSOFT');
   if (!token) return;
 

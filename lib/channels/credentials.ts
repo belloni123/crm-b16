@@ -32,9 +32,13 @@ export function decryptChannelCredentials<T>(serialized: string): T {
   if (envelope.v !== 1) throw new Error("Unsupported credential envelope.");
   const activeId = process.env.CHANNEL_CREDENTIALS_KEY_ID;
   const active = process.env.CHANNEL_CREDENTIALS_ENCRYPTION_KEY;
+  const previousId = process.env.CHANNEL_CREDENTIALS_PREVIOUS_KEY_ID;
   const previous = process.env.CHANNEL_CREDENTIALS_PREVIOUS_KEY;
-  const rawKey = envelope.keyId === activeId ? active : previous;
-  const key = parseKey(rawKey, envelope.keyId === activeId ? "CHANNEL_CREDENTIALS_ENCRYPTION_KEY" : "CHANNEL_CREDENTIALS_PREVIOUS_KEY");
+  const isActive = envelope.keyId === activeId;
+  const isPrevious = Boolean(previousId) && envelope.keyId === previousId;
+  if (!isActive && !isPrevious) throw new Error("Credential envelope keyId is not configured.");
+  const rawKey = isActive ? active : previous;
+  const key = parseKey(rawKey, isActive ? "CHANNEL_CREDENTIALS_ENCRYPTION_KEY" : "CHANNEL_CREDENTIALS_PREVIOUS_KEY");
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(envelope.iv, "base64"));
   decipher.setAuthTag(Buffer.from(envelope.tag, "base64"));
   const plaintext = Buffer.concat([
