@@ -12,9 +12,10 @@ A Fase 1B implementou a fundação omnichannel de forma aditiva e foi publicada 
 
 - Recurso identificado: projeto Coolify `CRM B16`, ambiente `production`, aplicação `dxxdd1sxep2dgnvucnj93xa0`, repositório `belloni123/crm-b16`, branch `main`, commit `215fa2de65b817cefa9c69bd7dd11d26c90fa527`.
 - Banco identificado: PostgreSQL 15.19, inspecionado em sessão com `transaction_read_only=on`.
-- Backup: `pg_dump` compatível com PostgreSQL 15, formato custom, `--no-owner`, `--no-acl`, consistência lógica e armazenamento temporário fora do Git com permissão restrita.
+- Backup: identificador técnico `backup-fase1a-20260902T180003Z`, gerado em 2026-09-02 18:00:03 UTC com `pg_dump` compatível com PostgreSQL 15, formato custom, `--no-owner`, `--no-acl`, consistência lógica e armazenamento temporário fora do Git com permissão restrita.
 - Integridade do backup: 284.304 bytes, SHA-256 `260bdd9c99fd4d5b8c4e284902cec4874aba648c177fc2d75da68c9e1e7348df`, catálogo validado por `pg_restore --list` com 142 entradas.
 - Restore: concluído em PostgreSQL 15 isolado, sem porta pública e sem uso como banco permanente de staging.
+- Retenção: o Coolify não possui outro backup agendado para essa aplicação; por isso o dump continua protegido fora do Git até existir outra cópia segura, conforme a regra de retenção do documento. Containers e rede temporários dos testes foram removidos após a coleta das evidências.
 - Histórico real: três migrations históricas, todas concluídas, sem rollback ou falha e com checksums iguais aos arquivos versionados.
 - Drift: o catálogo real correspondia ao schema Prisma atual, exceto defaults de `updatedAt` em duas colunas; o replay vazio ainda exigia representar artefatos legados de `Lead` e suas FKs.
 
@@ -102,6 +103,7 @@ Foram adicionados `ChannelConnection`, `ContactIdentity`, `ProviderEvent`, `Outb
 - Build Next.js: aprovado.
 - Testes automatizados: 24/24 aprovados, sendo 16 legados e 8 da fundação.
 - Lint: zero erros; 37 warnings preexistentes fora do escopo.
+- Auditoria de dependências de produção: zero vulnerabilidades (`npm audit --omit=dev --audit-level=critical`).
 - Migration em banco vazio: aprovada, reaplicação idempotente e status Prisma atualizado.
 - Migration em clone restaurado: aprovada, reaplicação idempotente, invariantes idênticos e zero drift material.
 - Seed sintético: 8 features criadas, 0 ativadas, 3 leads falsos e 0 conexões ativas.
