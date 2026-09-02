@@ -2,9 +2,31 @@ import { randomUUID } from "node:crypto";
 import type { OutboxEvent } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createFoundationQueue, isQueueName } from "@/lib/queues";
+import type { QueueName } from "@/lib/queues";
 import { structuredLog } from "@/lib/observability";
 
 export type DispatchResult = { claimed: number; published: number; retried: number; deadLettered: number; recoveredExpiredLeases: number };
+
+type QueuePublisher = {
+  add: (name: string, data: Record<string, unknown>, options: { jobId: string }) => Promise<unknown>;
+  close: () => Promise<void>;
+};
+
+type QueueFactory = (name: QueueName) => QueuePublisher;
+
+type DispatchOptions = {
+  workerId?: string;
+  leaseMs?: number;
+  queueFactory?: QueueFactory;
+};
+
+const defaultQueueFactory: QueueFactory = (name) => {
+  const queue = createFoundationQueue(name);
+  return {
+    add: (jobName, data, options) => queue.add(jobName, data, options),
+    close: () => queue.close(),
+  };
+};
 
 export function outboxBackoffMs(attempt: number, random = Math.random()) {
   const base = Math.min(300_000, 1000 * (2 ** Math.max(0, attempt - 1)));
@@ -36,24 +58,25 @@ async function claimOutbox(limit: number, workerId: string, leaseMs: number) {
   `);
 }
 
-async function publishDeadLetter(event: OutboxEvent) {
-  const queue = createFoundationQueue("dead-letter");
+async function publishDeadLetter(event: OutboxEvent, queueFactory: QueueFactory) {
+  const queue = queueFactory("dead-letter");
   try {
     await queue.add("OUTBOX_DEAD_LETTER", { outboxEventId: event.id, projectId: event.projectId, errorCode: "MAX_ATTEMPTS_EXCEEDED" }, { jobId: `dlq-${event.id}` });
     await prisma.outboxEvent.update({ where: { id: event.id }, data: { deadLetterPublishedAt: new Date() } });
   } finally { await queue.close(); }
 }
 
-export async function dispatchOutboxBatch(limit = 25, options: { workerId?: string; leaseMs?: number } = {}): Promise<DispatchResult> {
+export async function dispatchOutboxBatch(limit = 25, options: DispatchOptions = {}): Promise<DispatchResult> {
   const workerId = options.workerId || `scheduler-${randomUUID()}`;
   const leaseMs = options.leaseMs || Number(process.env.OUTBOX_LEASE_MS || 60_000);
+  const queueFactory = options.queueFactory || defaultQueueFactory;
   const claimed = await claimOutbox(limit, workerId, leaseMs);
   const result: DispatchResult = { claimed: claimed.length, published: 0, retried: 0, deadLettered: 0, recoveredExpiredLeases: claimed.filter((row) => row.attempts > 1).length };
 
   for (const event of claimed) {
     try {
       if (!isQueueName(event.targetQueue)) throw new Error("UNKNOWN_TARGET_QUEUE");
-      const queue = createFoundationQueue(event.targetQueue);
+      const queue = queueFactory(event.targetQueue);
       try {
         await queue.add(event.eventType, { outboxEventId: event.id, projectId: event.projectId }, { jobId: event.id });
       } finally { await queue.close(); }
@@ -63,7 +86,7 @@ export async function dispatchOutboxBatch(limit = 25, options: { workerId?: stri
       const errorCode = error instanceof Error && error.message === "UNKNOWN_TARGET_QUEUE" ? "UNKNOWN_TARGET_QUEUE" : "QUEUE_PUBLISH_FAILED";
       if (errorCode === "UNKNOWN_TARGET_QUEUE" || shouldDeadLetter(event.attempts, event.maxAttempts)) {
         await prisma.outboxEvent.updateMany({ where: { id: event.id, status: "PROCESSING", lockedBy: workerId }, data: { status: "DEAD_LETTER", deadLetteredAt: new Date(), lockedAt: null, lockedBy: null, lockedUntil: null, lastErrorCode: errorCode } });
-        try { await publishDeadLetter(event); } catch { structuredLog("error", "outbox.dlq.publish.failed", { outboxEventId: event.id, errorCode: "DLQ_UNAVAILABLE" }); }
+        try { await publishDeadLetter(event, queueFactory); } catch { structuredLog("error", "outbox.dlq.publish.failed", { outboxEventId: event.id, errorCode: "DLQ_UNAVAILABLE" }); }
         result.deadLettered += 1;
       } else {
         await prisma.outboxEvent.updateMany({ where: { id: event.id, status: "PROCESSING", lockedBy: workerId }, data: { status: "PENDING", lockedAt: null, lockedBy: null, lockedUntil: null, lastErrorCode: errorCode, availableAt: new Date(Date.now() + outboxBackoffMs(event.attempts)) } });
