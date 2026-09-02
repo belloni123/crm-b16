@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: nfs-crm-postgres
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -15,11 +14,22 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nfs-crm-app
     restart: always
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -40,8 +50,20 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
       MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:-staging}
+      OUTBOUND_INTEGRATIONS_DISABLED: ${OUTBOUND_INTEGRATIONS_DISABLED:-true}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CHANNEL_CREDENTIALS_ENCRYPTION_KEY: ${CHANNEL_CREDENTIALS_ENCRYPTION_KEY}
+      CHANNEL_CREDENTIALS_KEY_ID: ${CHANNEL_CREDENTIALS_KEY_ID}
+      CHANNEL_CREDENTIALS_PREVIOUS_KEY: ${CHANNEL_CREDENTIALS_PREVIOUS_KEY:-}
+      META_WEBHOOK_VERIFY_TOKEN: ${META_WEBHOOK_VERIFY_TOKEN}
+      META_APP_SECRET: ${META_APP_SECRET}
+      EVOLUTION_FOUNDATION_WEBHOOK_SECRET: ${EVOLUTION_FOUNDATION_WEBHOOK_SECRET}
+      OBJECT_STORAGE_ENABLED: ${OBJECT_STORAGE_ENABLED:-false}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
@@ -50,6 +72,61 @@ services:
       retries: 5
       start_period: 30s
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    command: ["npm", "run", "worker"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:-staging}
+      OUTBOUND_INTEGRATIONS_DISABLED: ${OUTBOUND_INTEGRATIONS_DISABLED:-true}
+      HEALTH_PORT: "3001"
+      CHANNEL_CREDENTIALS_ENCRYPTION_KEY: ${CHANNEL_CREDENTIALS_ENCRYPTION_KEY}
+      CHANNEL_CREDENTIALS_KEY_ID: ${CHANNEL_CREDENTIALS_KEY_ID}
+    depends_on:
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    command: ["npm", "run", "scheduler"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:-staging}
+      OUTBOUND_INTEGRATIONS_DISABLED: ${OUTBOUND_INTEGRATIONS_DISABLED:-true}
+      HEALTH_PORT: "3002"
+      OUTBOX_POLL_INTERVAL_MS: "5000"
+      CHANNEL_CREDENTIALS_ENCRYPTION_KEY: ${CHANNEL_CREDENTIALS_ENCRYPTION_KEY}
+      CHANNEL_CREDENTIALS_KEY_ID: ${CHANNEL_CREDENTIALS_KEY_ID}
+    depends_on:
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
 volumes:
   pgdata:
+    driver: local
+  redisdata:
     driver: local

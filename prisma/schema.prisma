@@ -8,22 +8,24 @@ generator client {
 }
 
 model User {
-  id                   String                @id @default(uuid())
-  name                 String?
-  email                String                @unique
-  passwordHash         String
-  role                 String                @default("USER") // "SUPERADMIN" or "USER"
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  resetToken           String?               @unique
-  resetTokenExpires    DateTime?
-  lgpdAccepted         Boolean               @default(false)
-  lgpdAcceptedAt       DateTime?
-  memberships          Membership[]
-  activities           Activity[]
-  assignedLeads        Lead[]                @relation("LeadAssignment")
-  calendarIntegrations CalendarIntegration[]
-  tasks                Task[]
+  id                    String                @id @default(uuid())
+  name                  String?
+  email                 String                @unique
+  passwordHash          String
+  role                  String                @default("USER") // "SUPERADMIN" or "USER"
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  resetToken            String?               @unique
+  resetTokenExpires     DateTime?
+  lgpdAccepted          Boolean               @default(false)
+  lgpdAcceptedAt        DateTime?
+  memberships           Membership[]
+  activities            Activity[]
+  assignedLeads         Lead[]                @relation("LeadAssignment")
+  calendarIntegrations  CalendarIntegration[]
+  tasks                 Task[]
+  assignedConversations Conversation[]        @relation("ConversationAssignment")
+  auditEvents           AuditEvent[]          @relation("AuditActor")
 }
 
 model Project {
@@ -46,6 +48,15 @@ model Project {
   lostStatuses             LostStatus[]
   customFieldDefinitions   CustomFieldDefinition[]
   forms                    Form[]
+  channelConnections       ChannelConnection[]
+  contactIdentities        ContactIdentity[]
+  providerEvents           ProviderEvent[]
+  outboxEvents             OutboxEvent[]
+  mediaObjects             MediaObject[]
+  features                 ProjectFeature[]
+  auditEvents              AuditEvent[]
+  omnichannelConversations Conversation[]          @relation("ConversationProject")
+  omnichannelMessages      Message[]               @relation("MessageProject")
 }
 
 model Membership {
@@ -118,6 +129,7 @@ model Lead {
   conversations     Conversation[]
   customFieldValues CustomFieldValue[]
   pipelineEntries   PipelineEntry[]
+  contactIdentities ContactIdentity[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   utmSource         String?
@@ -279,31 +291,71 @@ model WhatsAppInstance {
 }
 
 model Conversation {
-  id            String           @id @default(uuid())
-  whatsappId    String // phone number
-  name          String
-  lastMessageAt DateTime         @default(now())
-  leadId        String?
-  lead          Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  instanceId    String
-  instance      WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
-  messages      Message[]
+  id                       String             @id @default(uuid())
+  whatsappId               String // phone number
+  name                     String
+  lastMessageAt            DateTime           @default(now())
+  leadId                   String?
+  lead                     Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  instanceId               String
+  instance                 WhatsAppInstance   @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  messages                 Message[]
+  projectId                String?
+  project                  Project?           @relation("ConversationProject", fields: [projectId], references: [id], onDelete: SetNull)
+  channelConnectionId      String?
+  channelConnection        ChannelConnection? @relation(fields: [channelConnectionId], references: [id], onDelete: SetNull)
+  contactIdentityId        String?
+  contactIdentity          ContactIdentity?   @relation(fields: [contactIdentityId], references: [id], onDelete: SetNull)
+  externalConversationId   String?
+  channel                  String?
+  status                   String?
+  assignedUserId           String?
+  assignedUser             User?              @relation("ConversationAssignment", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  lastInboundAt            DateTime?
+  lastOutboundAt           DateTime?
+  customerCareWindowEndsAt DateTime?
+  updatedAt                DateTime?
 
   @@unique([whatsappId, instanceId])
+  @@index([projectId, channel, status])
+  @@index([channelConnectionId, lastMessageAt])
 }
 
 model Message {
-  id             String       @id @default(uuid())
-  remoteId       String?
-  content        String
-  direction      String // "INBOUND" or "OUTBOUND"
-  status         String       @default("SENT") // "SENT", "DELIVERED", "READ"
-  messageType    String       @default("TEXT") // "TEXT", "IMAGE", "DOCUMENT", "AUDIO"
-  mediaUrl       String? // URL para arquivos de mídia
-  senderName     String?
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime     @default(now())
+  id                  String             @id @default(uuid())
+  remoteId            String?
+  content             String
+  direction           String // "INBOUND" or "OUTBOUND"
+  status              String             @default("SENT") // "SENT", "DELIVERED", "READ"
+  messageType         String             @default("TEXT") // "TEXT", "IMAGE", "DOCUMENT", "AUDIO"
+  mediaUrl            String? // URL para arquivos de mídia
+  senderName          String?
+  conversationId      String
+  conversation        Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt           DateTime           @default(now())
+  projectId           String?
+  project             Project?           @relation("MessageProject", fields: [projectId], references: [id], onDelete: SetNull)
+  channelConnectionId String?
+  channelConnection   ChannelConnection? @relation(fields: [channelConnectionId], references: [id], onDelete: SetNull)
+  providerMessageId   String?
+  idempotencyKey      String?
+  errorCode           String?
+  errorDetailRedacted String?
+  acceptedAt          DateTime?
+  sentAt              DateTime?
+  deliveredAt         DateTime?
+  readAt              DateTime?
+  failedAt            DateTime?
+  replyToMessageId    String?
+  replyToMessage      Message?           @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies             Message[]          @relation("MessageReplies")
+  mediaObjectId       String?
+  mediaObject         MediaObject?       @relation(fields: [mediaObjectId], references: [id], onDelete: SetNull)
+  metadata            String?
+  updatedAt           DateTime?
+
+  @@index([projectId, createdAt])
+  @@index([channelConnectionId, providerMessageId])
 }
 
 model Form {
@@ -352,4 +404,159 @@ model CalendarIntegration {
   updatedAt    DateTime  @updatedAt
 
   @@unique([userId, provider])
+}
+
+model ChannelConnection {
+  id                         String            @id @default(uuid())
+  projectId                  String
+  project                    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider                   String
+  channel                    String
+  name                       String
+  status                     String            @default("DISABLED")
+  externalBusinessId         String?
+  externalWabaId             String?
+  externalPhoneNumberId      String?
+  externalPageId             String?
+  externalInstagramAccountId String?
+  credentialsEncrypted       String?
+  credentialsKeyId           String?
+  tokenExpiresAt             DateTime?
+  capabilitiesSnapshot       String?
+  metadata                   String?
+  lastHealthAt               DateTime?
+  lastErrorCode              String?
+  isActive                   Boolean           @default(false)
+  archivedAt                 DateTime?
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+  contactIdentities          ContactIdentity[]
+  providerEvents             ProviderEvent[]
+  conversations              Conversation[]
+  messages                   Message[]
+
+  @@index([projectId, provider, channel, isActive])
+}
+
+model ContactIdentity {
+  id                  String            @id @default(uuid())
+  projectId           String
+  project             Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  channelConnectionId String
+  channelConnection   ChannelConnection @relation(fields: [channelConnectionId], references: [id], onDelete: Restrict)
+  channel             String
+  externalUserId      String
+  address             String?
+  normalizedAddress   String?
+  displayName         String?
+  avatarUrl           String?
+  leadId              String?
+  lead                Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  lastInboundAt       DateTime?
+  lastOutboundAt      DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  conversations       Conversation[]
+
+  @@unique([channelConnectionId, externalUserId])
+  @@index([projectId, channel, normalizedAddress])
+  @@index([leadId])
+}
+
+model ProviderEvent {
+  id                  String            @id @default(uuid())
+  projectId           String
+  project             Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  channelConnectionId String
+  channelConnection   ChannelConnection @relation(fields: [channelConnectionId], references: [id], onDelete: Restrict)
+  provider            String
+  externalEventKey    String
+  eventType           String
+  payloadHash         String
+  payloadEncrypted    String?
+  status              String            @default("RECEIVED")
+  attempts            Int               @default(0)
+  occurredAt          DateTime?
+  receivedAt          DateTime          @default(now())
+  processedAt         DateTime?
+  lastErrorCode       String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@unique([channelConnectionId, externalEventKey])
+  @@index([projectId, status, receivedAt])
+}
+
+model OutboxEvent {
+  id             String    @id @default(uuid())
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  aggregateType  String
+  aggregateId    String
+  eventType      String
+  payload        String
+  idempotencyKey String    @unique
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  availableAt    DateTime  @default(now())
+  lockedAt       DateTime?
+  publishedAt    DateTime?
+  lastErrorCode  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, availableAt])
+  @@index([projectId, createdAt])
+}
+
+model MediaObject {
+  id              String    @id @default(uuid())
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  storageKey      String
+  bucket          String
+  contentType     String
+  sizeBytes       BigInt
+  checksum        String
+  scanStatus      String    @default("PENDING")
+  providerMediaId String?
+  retentionUntil  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  messages        Message[]
+
+  @@unique([projectId, storageKey])
+  @@index([projectId, retentionUntil])
+}
+
+model ProjectFeature {
+  id            String   @id @default(uuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key           String
+  enabled       Boolean  @default(false)
+  configuration String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([projectId, key])
+  @@index([projectId, enabled])
+}
+
+model AuditEvent {
+  id               String   @id @default(uuid())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorUserId      String?
+  actorUser        User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action           String
+  resourceType     String
+  resourceId       String
+  correlationId    String?
+  reason           String?
+  metadataRedacted String?
+  createdAt        DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([correlationId])
 }

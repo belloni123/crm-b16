@@ -6,15 +6,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "worker": "tsx workers/index.ts",
+    "scheduler": "tsx scheduler/index.ts",
+    "seed:staging": "tsx prisma/seed-staging.ts",
     "lint": "eslint",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts tests/omnichannel-foundation/*.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1124.0",
+    "@aws-sdk/s3-request-presigner": "^3.1124.0",
     "@prisma/client": "^5.12.1",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.81.4",
     "clsx": "^2.1.1",
     "framer-motion": "^11.18.2",
     "gray-matter": "^4.0.3",
+    "ioredis": "^5.11.1",
     "lucide-react": "^1.16.0",
     "next": "16.3.4",
     "next-auth": "4.24.15",
