@@ -47,6 +47,7 @@ next-env.d.ts
 *.sqlite-journal
 *.sql
 !prisma/migrations/**/migration.sql
+!scripts/db/*.sql
 
 # temporary scratch files
 /scratch/
