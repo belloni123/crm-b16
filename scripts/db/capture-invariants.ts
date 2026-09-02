@@ -6,7 +6,14 @@ const protectedTables = [
   "Project", "Lead", "PipelineEntry", "Conversation", "Message", "Activity",
   "Task", "Tag", "CustomFieldDefinition", "CustomFieldValue", "WebhookEndpoint",
   "WebhookLog", "Form", "FormField", "CalendarIntegration",
+  "ChannelConnection", "ContactIdentity", "ProviderEvent", "OutboxEvent",
+  "MediaObject", "ProjectFeature", "AuditEvent",
 ] as const;
+
+const additiveColumnsIgnoredForDataHash: Record<string, readonly string[]> = {
+  Conversation: ["projectId", "channelConnectionId", "contactIdentityId", "externalConversationId", "channel", "status", "assignedUserId", "lastInboundAt", "lastOutboundAt", "customerCareWindowEndsAt", "updatedAt"],
+  Message: ["projectId", "channelConnectionId", "providerMessageId", "idempotencyKey", "errorCode", "errorDetailRedacted", "acceptedAt", "sentAt", "deliveredAt", "readAt", "failedAt", "replyToMessageId", "mediaObjectId", "metadata", "updatedAt"],
+};
 
 type Snapshot = {
   format: "crm-b16-invariants-v1";
@@ -43,9 +50,11 @@ async function captureTable(prisma: PrismaClient, table: string) {
     return { exists: false, count: 0, digest: digestRows([]) };
   }
   // Values never leave this process in clear text; only a SHA-256 digest is emitted.
-  const rows = await prisma.$queryRawUnsafe<unknown[]>(
-    `SELECT to_jsonb(t) AS row FROM public."${table}" t ORDER BY t."id"`,
-  );
+  const ignored = additiveColumnsIgnoredForDataHash[table] || [];
+  const projection = ignored.length
+    ? `to_jsonb(t) - ARRAY[${ignored.map((column) => `'${column}'`).join(",")}]::text[]`
+    : "to_jsonb(t)";
+  const rows = await prisma.$queryRawUnsafe<unknown[]>(`SELECT ${projection} AS row FROM public."${table}" t ORDER BY t."id"`);
   return { exists: true, count: rows.length, digest: digestRows(rows) };
 }
 
