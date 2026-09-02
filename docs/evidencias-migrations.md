@@ -6,7 +6,7 @@ Branch: `chore/prisma-history-reconciliation`
 
 Commit-base: `215fa2de65b817cefa9c69bd7dd11d26c90fa527`
 
-Escopo desta evidência: repositório local. Nenhuma conclusão sobre o catálogo real ou `_prisma_migrations` de produção é feita sem acesso read-only verificável.
+Escopo desta evidência: repositório, produção em sessão PostgreSQL forçada como read-only e duas instâncias PostgreSQL 15 isoladas. Nenhuma migration foi executada em produção.
 
 ## 1. Runtime e ferramentas
 
@@ -100,25 +100,42 @@ O `schema.prisma` possui 22 models e nenhum `enum` Prisma. Estados e tipos são 
 
 O código atual consulta explicitamente `PipelineEntry`, `Form`, `FormField` e `CalendarIntegration`, além dos models iniciais. Portanto, esses objetos não são apenas declarações não usadas no schema.
 
-## 5. Drift observável somente pelo repositório
+## 5. Diagnóstico definitivo do catálogo restaurado
 
-Esta é uma constatação preliminar, não o diagnóstico definitivo do banco.
+O PostgreSQL correto foi identificado pelo vínculo do recurso Coolify com o repositório `belloni123/crm-b16`, branch `main`, commit de produção `215fa2de65b817cefa9c69bd7dd11d26c90fa527`. A sessão de produção confirmou `transaction_read_only=on`, PostgreSQL `15.19`, database `crm_b16` e role da aplicação, sem expor a URL ou credenciais.
+
+O dump custom-format foi criado em armazenamento restrito fora do Git:
+
+| Evidência | Resultado |
+|---|---|
+| arquivo | `crm-b16-phase1a-20260902T175957Z.dump` |
+| bytes | `284304` |
+| SHA-256 | `260bdd9c99fd4d5b8c4e284902cec4874aba648c177fc2d75da68c9e1e7348df` |
+| `pg_restore -l` | válido, 142 entradas |
+| restore | PostgreSQL 15 isolado, sem portas publicadas |
+| tabelas públicas | 24, incluindo `_prisma_migrations` |
+
+As três linhas históricas de `_prisma_migrations` estavam concluídas, sem rollback, e seus checksums coincidiram exatamente com os arquivos versionados. O catálogo restaurado correspondeu ao `schema.prisma`, salvo dois defaults técnicos em `CustomFieldDefinition.updatedAt` e `WebhookEndpoint.updatedAt`. Esses defaults foram removidos apenas nas cópias de teste pela migration de reconciliação.
+
+## 6. Matriz de drift concluída
 
 | Categoria | Evidência local |
 |---|---|
-| objeto esperado sem migration versionada | `PipelineEntry`, `Form`, `FormField`, `CalendarIntegration` |
-| colunas antigas versionadas e ausentes do schema atual | `Lead.status`, `Lead.value`, `Lead.stageId`, `Lead.lostStatusId` |
-| colunas atuais sem histórico visível | campos de reset/LGPD de `User`; API/round-robin de `Project`; comercial de `Membership`; responsável e tracking de `Lead`; calendário/responsável de `Task` |
-| default divergente | `Stage.color` e `Tag.color`: migration inicial usa `#6D8A6C`, schema atual usa `#9FE870` |
-| lock do provider ausente | `prisma/migrations/migration_lock.toml` inexistente |
-| histórico real desconhecido | `_prisma_migrations` e catálogo do banco não acessíveis nesta captura |
+| objeto existente no catálogo e no schema, mas ausente das três migrations antigas | `PipelineEntry`, `Form`, `FormField`, `CalendarIntegration` |
+| colunas existentes no catálogo/schema, mas ausentes do histórico | reset/LGPD de `User`; API/round-robin de `Project`; comercial de `Membership`; responsável/tracking de `Lead`; calendário/responsável de `Task` |
+| objetos históricos obsoletos | `Lead.status`, `Lead.value`, `Lead.stageId`, `Lead.lostStatusId` aparecem somente no replay vazio; não existem no catálogo restaurado |
+| defaults históricos | `Stage.color`/`Tag.color` foram reconciliados para `#9FE870`; dois defaults de `updatedAt` foram removidos nas cópias |
+| provider lock | criado como `postgresql` |
+| drift após reconciliação na cópia restaurada | zero (`prisma migrate diff` retornou apenas o marcador de migration vazia, 32 bytes) |
+| drift residual no replay vazio | quatro colunas e duas FKs legadas de `Lead`, 283 bytes; removê-las exigiria `DROP COLUMN`, proibido pelo contrato de segurança |
 
-Não é seguro inferir, a partir dessa tabela, que algum objeto deva ser criado, removido ou marcado como aplicado em produção.
+O drift residual do replay vazio é deliberado e operacionalmente inofensivo: `stageId` legado foi tornado nullable, nenhuma coluna é mapeada pelo Prisma atual e nenhum dado foi movido ou apagado.
 
-## 6. Integridade desta captura
+## 7. Integridade desta captura
 
 - migrations existentes permaneceram byte a byte inalteradas;
-- `schema.prisma`, runtime, Docker/Compose e lockfiles não foram alterados;
-- nenhuma conexão com banco foi estabelecida;
-- nenhum comando Prisma de escrita foi executado;
-- nenhuma credencial, URL, PII ou conteúdo comercial foi registrado neste documento.
+- `schema.prisma`, runtime, Docker/Compose e lockfiles de dependências não foram alterados;
+- a única leitura em produção ocorreu com `default_transaction_read_only=on`;
+- comandos Prisma de escrita foram executados somente nos bancos efêmeros isolados;
+- nenhuma credencial, URL de banco, PII ou conteúdo comercial foi registrado neste documento;
+- produção permaneceu no commit `215fa2de65b817cefa9c69bd7dd11d26c90fa527`, sem migration, variável ou deploy.
