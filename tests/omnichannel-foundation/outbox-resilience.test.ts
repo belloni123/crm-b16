@@ -47,7 +47,7 @@ test("outbox recupera crashes, evita duplicatas e aplica retry/DLQ sob concorrê
       lockedBy: "dead-scheduler-before-add",
       lockedUntil: new Date(Date.now() - 60_000),
     });
-    const recoveredBeforePublish = await dispatchOutboxBatch(1, { workerId: "recovery-before-add" });
+    const recoveredBeforePublish = await dispatchOutboxBatch(1, { workerId: "recovery-before-add", projectId });
     assert.equal(recoveredBeforePublish.recoveredExpiredLeases, 1);
     assert.equal((await prisma.outboxEvent.findUniqueOrThrow({ where: { id: claimedBeforePublish.id } })).status, "PUBLISHED");
     assert.ok(await providerQueue.getJob(claimedBeforePublish.id));
@@ -62,7 +62,7 @@ test("outbox recupera crashes, evita duplicatas e aplica retry/DLQ sob concorrê
     });
     await providerQueue.add("SYNTHETIC_EVENT", { outboxEventId: claimedAfterPublish.id, projectId }, { jobId: claimedAfterPublish.id });
     const countAfterFirstAdd = (await providerQueue.getJobCounts("waiting")).waiting;
-    const recoveredAfterPublish = await dispatchOutboxBatch(1, { workerId: "recovery-after-add" });
+    const recoveredAfterPublish = await dispatchOutboxBatch(1, { workerId: "recovery-after-add", projectId });
     assert.equal(recoveredAfterPublish.recoveredExpiredLeases, 1);
     assert.equal((await providerQueue.getJobCounts("waiting")).waiting, countAfterFirstAdd);
     assert.equal((await prisma.outboxEvent.findUniqueOrThrow({ where: { id: claimedAfterPublish.id } })).status, "PUBLISHED");
@@ -70,8 +70,8 @@ test("outbox recupera crashes, evita duplicatas e aplica retry/DLQ sob concorrê
     // Dois schedulers disputam o mesmo lote; SKIP LOCKED deve entregar cada linha uma única vez.
     const concurrentIds = await Promise.all(Array.from({ length: 12 }, (_, index) => createEvent(`concurrent-${index}`))).then((rows) => rows.map((row) => row.id));
     const concurrentResults = await Promise.all([
-      dispatchOutboxBatch(12, { workerId: "scheduler-a" }),
-      dispatchOutboxBatch(12, { workerId: "scheduler-b" }),
+      dispatchOutboxBatch(12, { workerId: "scheduler-a", projectId }),
+      dispatchOutboxBatch(12, { workerId: "scheduler-b", projectId }),
     ]);
     assert.equal(concurrentResults.reduce((sum, result) => sum + result.claimed, 0), 12);
     assert.equal(await prisma.outboxEvent.count({ where: { id: { in: concurrentIds }, status: "PUBLISHED" } }), 12);
@@ -83,7 +83,7 @@ test("outbox recupera crashes, evita duplicatas e aplica retry/DLQ sob concorrê
       add: async () => { throw new Error("SYNTHETIC_REDIS_UNAVAILABLE"); },
       close: async () => undefined,
     });
-    const retryResult = await dispatchOutboxBatch(1, { workerId: "scheduler-retry", queueFactory: unavailableFactory });
+    const retryResult = await dispatchOutboxBatch(1, { workerId: "scheduler-retry", projectId, queueFactory: unavailableFactory });
     assert.equal(retryResult.retried, 1);
     const retryRow = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: redisUnavailable.id } });
     assert.equal(retryRow.status, "PENDING");
@@ -100,7 +100,7 @@ test("outbox recupera crashes, evita duplicatas e aplica retry/DLQ sob concorrê
         close: () => queue.close(),
       };
     };
-    const deadLetterResult = await dispatchOutboxBatch(1, { workerId: "scheduler-dlq", queueFactory: failTargetOnly });
+    const deadLetterResult = await dispatchOutboxBatch(1, { workerId: "scheduler-dlq", projectId, queueFactory: failTargetOnly });
     assert.equal(deadLetterResult.deadLettered, 1);
     const deadLetterRow = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: maxAttempts.id } });
     assert.equal(deadLetterRow.status, "DEAD_LETTER");
@@ -110,7 +110,7 @@ test("outbox recupera crashes, evita duplicatas e aplica retry/DLQ sob concorrê
     assert.deepEqual(deadLetterJob?.data, { outboxEventId: maxAttempts.id, projectId, errorCode: "MAX_ATTEMPTS_EXCEEDED" });
 
     // Reexecução não republica eventos terminalmente processados.
-    const idempotentReplay = await dispatchOutboxBatch(50, { workerId: "scheduler-replay" });
+    const idempotentReplay = await dispatchOutboxBatch(50, { workerId: "scheduler-replay", projectId });
     assert.equal(idempotentReplay.claimed, 0);
   } finally {
     await providerQueue.obliterate({ force: true }).catch(() => undefined);

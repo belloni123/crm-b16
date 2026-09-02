@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { OutboxEvent } from "@prisma/client";
+import { Prisma, type OutboxEvent } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createFoundationQueue, isQueueName } from "@/lib/queues";
 import type { QueueName } from "@/lib/queues";
@@ -17,6 +17,7 @@ type QueueFactory = (name: QueueName) => QueuePublisher;
 type DispatchOptions = {
   workerId?: string;
   leaseMs?: number;
+  projectId?: string;
   queueFactory?: QueueFactory;
 };
 
@@ -37,13 +38,15 @@ export function shouldDeadLetter(attempts: number, maxAttempts: number) {
   return attempts >= maxAttempts;
 }
 
-async function claimOutbox(limit: number, workerId: string, leaseMs: number) {
+async function claimOutbox(limit: number, workerId: string, leaseMs: number, projectId?: string) {
+  const projectFilter = projectId ? Prisma.sql`AND "projectId" = ${projectId}` : Prisma.empty;
   return prisma.$transaction(async (tx) => tx.$queryRaw<OutboxEvent[]>`
     WITH candidates AS (
       SELECT "id"
       FROM "OutboxEvent"
       WHERE (("status" = 'PENDING' AND "availableAt" <= NOW())
         OR ("status" = 'PROCESSING' AND "lockedUntil" < NOW()))
+      ${projectFilter}
       ORDER BY "availableAt", "createdAt"
       FOR UPDATE SKIP LOCKED
       LIMIT ${limit}
@@ -70,7 +73,7 @@ export async function dispatchOutboxBatch(limit = 25, options: DispatchOptions =
   const workerId = options.workerId || `scheduler-${randomUUID()}`;
   const leaseMs = options.leaseMs || Number(process.env.OUTBOX_LEASE_MS || 60_000);
   const queueFactory = options.queueFactory || defaultQueueFactory;
-  const claimed = await claimOutbox(limit, workerId, leaseMs);
+  const claimed = await claimOutbox(limit, workerId, leaseMs, options.projectId);
   const result: DispatchResult = { claimed: claimed.length, published: 0, retried: 0, deadLettered: 0, recoveredExpiredLeases: claimed.filter((row) => row.attempts > 1).length };
 
   for (const event of claimed) {
