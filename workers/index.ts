@@ -12,7 +12,7 @@ const workerOptions = () => ({ prefix: queuePrefix(), connection: createRedisCon
 const workers = [
   new Worker("provider-events", async (job) => {
     if (!job.data.outboxEventId) throw new Error("MISSING_OUTBOX_EVENT_ID");
-    if (!["PROVIDER_EVENT_RECEIVED", "EVOLUTION_DUAL_WRITE"].includes(job.name)) throw new Error("UNKNOWN_PROVIDER_EVENT_JOB");
+    if (!["PROVIDER_EVENT_RECEIVED", "EVOLUTION_DUAL_WRITE", "EVOLUTION_DUAL_WRITE_RETRY"].includes(job.name)) throw new Error("UNKNOWN_PROVIDER_EVENT_JOB");
     return { status: "RECORDED" };
   }, workerOptions()),
   new Worker("outbox-dispatch", async () => { throw new Error("DEPRECATED_OUTBOX_DISPATCH_QUEUE"); }, workerOptions()),

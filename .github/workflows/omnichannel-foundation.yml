@@ -31,6 +31,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/crm_b16_ci?schema=public
       REDIS_URL: redis://127.0.0.1:6379
       TEST_REDIS_URL: redis://127.0.0.1:6379
+      RUN_DB_INTEGRATION_TESTS: "true"
       DB_SAFETY_SCOPE: isolated
       DEPLOYMENT_ENV: ci
       QUEUE_PREFIX: crm-b16-ci

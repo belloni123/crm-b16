@@ -35,6 +35,24 @@ async function main() {
         create: { id: `staging-entry-${index}`, leadId: lead.id, pipelineId: pipeline.id, stageId: stage.id },
       });
     }
+    const syntheticInstance = await prisma.whatsAppInstance.upsert({
+      where: { instanceName: "staging_evolution_synthetic" },
+      update: { token: null, status: "DISCONNECTED", archivedAt: null },
+      create: { id: "staging-evolution-instance", name: "Evolution sintética", instanceName: "staging_evolution_synthetic", token: null, status: "DISCONNECTED", type: "WHATSAPP", projectId: project.id },
+    });
+    const syntheticConversation = await prisma.conversation.upsert({
+      where: { whatsappId_instanceId: { whatsappId: "550000000099", instanceId: syntheticInstance.id } },
+      update: {},
+      create: { id: "staging-evolution-conversation", whatsappId: "550000000099", name: "Contato sintético", instanceId: syntheticInstance.id, leadId: "staging-lead-1" },
+    });
+    const existingSyntheticMessage = await prisma.message.findFirst({ where: { id: "staging-evolution-message" } });
+    if (!existingSyntheticMessage) {
+      await prisma.message.create({ data: { id: "staging-evolution-message", remoteId: "synthetic-remote-message-1", content: "Mensagem sintética sem envio externo", direction: "INBOUND", status: "DELIVERED", conversationId: syntheticConversation.id } });
+    }
+    const existingSyntheticOutbound = await prisma.message.findFirst({ where: { id: "staging-evolution-outbound-message" } });
+    if (!existingSyntheticOutbound) {
+      await prisma.message.create({ data: { id: "staging-evolution-outbound-message", remoteId: "synthetic-remote-message-2", content: "Saída sintética sem chamada externa", direction: "OUTBOUND", status: "SENT", conversationId: syntheticConversation.id } });
+    }
     await prisma.channelConnection.upsert({
       where: { id: "staging-connection-disabled" },
       update: { isActive: false, status: "DISABLED", credentialsEncrypted: null },

@@ -278,16 +278,18 @@ model WebhookLog {
 }
 
 model WhatsAppInstance {
-  id            String         @id @default(uuid())
-  name          String
-  instanceName  String         @unique
-  token         String?
-  status        String         @default("DISCONNECTED") // "CONNECTED", "DISCONNECTED"
-  type          String         @default("WHATSAPP") // Preparado para canais futuros
-  projectId     String
-  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  conversations Conversation[]
-  createdAt     DateTime       @default(now())
+  id                String             @id @default(uuid())
+  name              String
+  instanceName      String             @unique
+  token             String?
+  status            String             @default("DISCONNECTED") // "CONNECTED", "DISCONNECTED"
+  type              String             @default("WHATSAPP") // Preparado para canais futuros
+  projectId         String
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  conversations     Conversation[]
+  channelConnection ChannelConnection?
+  createdAt         DateTime           @default(now())
+  archivedAt        DateTime?
 }
 
 model Conversation {
@@ -428,6 +430,8 @@ model ChannelConnection {
   lastErrorCode              String?
   isActive                   Boolean           @default(false)
   archivedAt                 DateTime?
+  legacyWhatsAppInstanceId   String?           @unique
+  legacyWhatsAppInstance     WhatsAppInstance? @relation(fields: [legacyWhatsAppInstanceId], references: [id], onDelete: SetNull)
   createdAt                  DateTime          @default(now())
   updatedAt                  DateTime          @updatedAt
   contactIdentities          ContactIdentity[]
@@ -569,4 +573,16 @@ model AuditEvent {
 
   @@index([projectId, createdAt])
   @@index([correlationId])
+}
+
+model BackfillCheckpoint {
+  id            String    @id @default(uuid())
+  key           String    @unique
+  cursor        String?
+  status        String    @default("PENDING")
+  countsJson    String?
+  conflictsJson String?
+  startedAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  completedAt   DateTime?
 }

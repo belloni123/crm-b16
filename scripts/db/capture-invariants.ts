@@ -8,7 +8,13 @@ const protectedTables = [
   "WebhookLog", "Form", "FormField", "CalendarIntegration",
   "ChannelConnection", "ContactIdentity", "ProviderEvent", "OutboxEvent",
   "MediaObject", "ProjectFeature", "AuditEvent",
+  "BackfillCheckpoint",
 ] as const;
+
+const foundationTables = new Set(["ChannelConnection", "ContactIdentity", "ProviderEvent", "OutboxEvent", "MediaObject", "ProjectFeature", "AuditEvent", "BackfillCheckpoint"]);
+const selectedTables = process.env.INVARIANT_PROFILE === "commercial"
+  ? protectedTables.filter((table) => !foundationTables.has(table))
+  : protectedTables;
 
 const additiveColumnsIgnoredForDataHash: Record<string, readonly string[]> = {
   Conversation: ["projectId", "channelConnectionId", "contactIdentityId", "externalConversationId", "channel", "status", "assignedUserId", "lastInboundAt", "lastOutboundAt", "customerCareWindowEndsAt", "updatedAt"],
@@ -73,7 +79,7 @@ async function main() {
   const prisma = new PrismaClient();
   try {
     const tablePairs = await Promise.all(
-      protectedTables.map(async (table) => [table, await captureTable(prisma, table)] as const),
+      selectedTables.map(async (table) => [table, await captureTable(prisma, table)] as const),
     );
     const orphanPairs = await Promise.all([
       orphanCount(prisma, "lead_project", `SELECT count(*)::bigint AS count FROM "Lead" l LEFT JOIN "Project" p ON p.id=l."projectId" WHERE p.id IS NULL`),

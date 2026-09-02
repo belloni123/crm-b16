@@ -10,6 +10,9 @@
     "worker": "tsx workers/index.ts",
     "scheduler": "tsx scheduler/index.ts",
     "seed:staging": "tsx prisma/seed-staging.ts",
+    "backfill:evolution": "tsx scripts/backfill-evolution-foundation.ts",
+    "shadow:evolution": "tsx scripts/shadow-compare-evolution.ts",
+    "test:evolution-dual-write": "tsx scripts/test-evolution-dual-write.ts",
     "lint": "eslint",
     "test": "tsx --test tests/*.test.ts tests/omnichannel-foundation/*.test.ts"
   },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getPhoneVariants, isGenericWhatsAppName } from '@/lib/utils';
+import { bridgeLegacyInboundSafely } from '@/lib/channels/evolution-bridge';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,8 +22,6 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    console.log('Recebido webhook do WhatsApp:', JSON.stringify(body));
-
     // A Evolution API envia eventos. O evento principal de mensagem recebida/enviada é "messages.upsert".
     // Também tratamos se vier diretamente sem o envelope de evento.
     const event = body.event;
@@ -236,6 +235,8 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
+    await bridgeLegacyInboundSafely({ projectId: instance.projectId, instanceId: instance.id, conversationId: conversation.id, messageId: message.id });
 
     return NextResponse.json({ success: true, messageId: message.id });
   } catch (err: any) {

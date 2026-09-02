@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getPhoneVariants } from '@/lib/utils';
 import crypto from 'crypto';
 import { outboundDecision } from '@/lib/outbound-policy';
+import { bridgeLegacyOutboundSafely } from '@/lib/channels/evolution-bridge';
 
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
@@ -250,8 +251,23 @@ export async function deleteWhatsAppInstance(projectId: string, instanceId: stri
     throw new Error('Instância não encontrada.');
   }
 
+  const historyCount = await prisma.conversation.count({ where: { instanceId: instance.id } });
+  if (historyCount > 0) {
+    await prisma.$transaction([
+      prisma.whatsAppInstance.update({ where: { id: instance.id }, data: { status: 'DISCONNECTED', archivedAt: new Date() } }),
+      prisma.channelConnection.updateMany({ where: { legacyWhatsAppInstanceId: instance.id }, data: { status: 'ARCHIVED', isActive: false, archivedAt: new Date() } }),
+      prisma.auditEvent.create({ data: { projectId, action: 'EVOLUTION_INSTANCE_ARCHIVED', resourceType: 'WhatsAppInstance', resourceId: instance.id, reason: 'HISTORY_PRESERVED', metadataRedacted: JSON.stringify({ conversationCount: historyCount }) } }),
+    ]);
+    revalidatePath(`/project/${projectId}/settings`);
+    return { success: true, archived: true };
+  }
+
   // Deleta da Evolution API se for WhatsApp
-  if (EVOLUTION_API_URL && EVOLUTION_API_KEY && instance.type === 'WHATSAPP' && outboundDecision('EVOLUTION', 'delete-instance').allowed) {
+  const deletionDecision = outboundDecision('EVOLUTION', 'delete-instance');
+  if (EVOLUTION_API_URL && EVOLUTION_API_KEY && instance.type === 'WHATSAPP' && !deletionDecision.allowed) {
+    return { success: false, blocked: true, message: deletionDecision.reason };
+  }
+  if (EVOLUTION_API_URL && EVOLUTION_API_KEY && instance.type === 'WHATSAPP') {
     try {
       await fetch(`${EVOLUTION_API_URL}/instance/delete/${instance.instanceName}`, {
         method: 'DELETE',
@@ -430,7 +446,9 @@ export async function sendWhatsAppMessage(
             data: { remoteId: result.key.id },
           });
         }
+        await bridgeLegacyOutboundSafely({ projectId, messageId: message.id, providerMessageId: result.key?.id || null, accepted: true });
       } else {
+        await bridgeLegacyOutboundSafely({ projectId, messageId: message.id, accepted: false, errorCode: `HTTP_${response.status}` });
         console.error('Erro ao enviar mensagem na Evolution API REST:', await response.text());
       }
     } catch (err) {
