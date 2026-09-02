@@ -34,7 +34,11 @@ async function main() {
         const job = await queue.getJob(outbox.id);
         if (job && (await job.getState()) !== "active") await job.remove();
       }
-    } finally { await queue.close(); }
+    } finally {
+      // This command is intentionally short-lived. Force-disconnect the BullMQ
+      // connection so a shared ioredis handle cannot keep the process alive.
+      await queue.disconnect();
+    }
     await prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: [inboundMessageId, outboundMessageId] }, status: { in: ["PENDING", "DEAD_LETTER"] } } });
     const pendingSynthetic = await prisma.outboxEvent.count({
       where: {
