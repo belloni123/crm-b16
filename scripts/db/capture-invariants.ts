@@ -28,8 +28,12 @@ function digestRows(rows: unknown[]) {
 
 async function tableExists(prisma: PrismaClient, table: string) {
   const rows = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
-    `SELECT to_regclass($1) IS NOT NULL AS exists`,
-    `public.${table}`,
+    `SELECT EXISTS (
+       SELECT 1
+       FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = $1
+     ) AS exists`,
+    table,
   );
   return Boolean(rows[0]?.exists);
 }
