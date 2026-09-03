@@ -82,15 +82,15 @@ test("webhook Meta resolve WABA+phone exatos, guarda todos os itens e não cria 
   } finally { await prisma.project.deleteMany({ where: { id: projectId } }); await prisma.$disconnect(); }
 });
 
-test("webhook Meta bloqueia resolução ambígua e ignora conexão desconhecida", { skip: !integration }, async () => {
+test("banco impede resolução Meta ambígua e webhook ignora conexão desconhecida", { skip: !integration }, async () => {
   const prisma = new PrismaClient(); const suffix = randomUUID(); const projectId = `meta-ambiguous-${suffix}`;
   process.env.REDIS_URL = process.env.TEST_REDIS_URL; process.env.QUEUE_PREFIX = `crm-b16-ci-meta-amb-${suffix}`; process.env.DEPLOYMENT_ENV = "ci"; process.env.META_APP_SECRET = `meta-secret-${suffix}`;
   const makeBody = (waba: string, phone: string) => JSON.stringify({ object: "whatsapp_business_account", entry: [{ id: waba, changes: [{ field: "messages", value: { metadata: { phone_number_id: phone }, messages: [] } }] }] });
   const send = (body: string) => metaWebhookPost(new Request("http://localhost/api/webhooks/providers/meta", { method: "POST", headers: { "x-hub-signature-256": `sha256=${createHmac("sha256", process.env.META_APP_SECRET!).update(body).digest("hex")}` }, body }));
   try {
     await prisma.project.create({ data: { id: projectId, name: "Ambiguous" } });
-    await prisma.channelConnection.createMany({ data: [1, 2].map((number) => ({ projectId, provider: "META_WHATSAPP", channel: "WHATSAPP", name: `c${number}`, isActive: true, externalWabaId: `waba-${suffix}`, externalPhoneNumberId: `phone-${suffix}` })) });
-    assert.equal((await send(makeBody(`waba-${suffix}`, `phone-${suffix}`))).status, 409);
+    await prisma.channelConnection.create({ data: { projectId, provider: "META_WHATSAPP", channel: "WHATSAPP", name: "c1", isActive: true, externalWabaId: `waba-${suffix}`, externalPhoneNumberId: `phone-${suffix}` } });
+    await assert.rejects(() => prisma.channelConnection.create({ data: { projectId, provider: "META_WHATSAPP", channel: "WHATSAPP", name: "c2", isActive: true, externalWabaId: `waba-${suffix}`, externalPhoneNumberId: `phone-${suffix}` } }));
     const unknown = await send(makeBody("unknown", "unknown")); assert.equal(unknown.status, 202); assert.equal((await unknown.json()).status, "UNKNOWN_CONNECTION");
   } finally { await prisma.project.deleteMany({ where: { id: projectId } }); await prisma.$disconnect(); }
 });
