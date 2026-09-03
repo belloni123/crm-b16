@@ -71,6 +71,24 @@ test("cliente Embedded Signup não contém App Secret nem persiste credencial no
   assert.match(source, /override_default_response_type: true/);
 });
 
+test("compose propaga somente a configuração Meta necessária ao processo web", async () => {
+  const compose = await readFile("docker-compose.yml", "utf8");
+  const required = [
+    "META_WEBHOOK_VERIFY_TOKEN",
+    "META_APP_ID",
+    "META_APP_SECRET",
+    "META_CONFIG_ID",
+    "META_GRAPH_API_VERSION",
+    "META_EMBEDDED_SIGNUP_VERSION",
+    "META_GRAPH_TIMEOUT_MS",
+    "META_PILOT_ALLOWLIST",
+    "META_PILOT_EXPIRES_AT",
+  ];
+  for (const variable of required) {
+    assert.match(compose, new RegExp(`^\\s{6}${variable}:`, "m"), `${variable} não chega ao container web`);
+  }
+});
+
 test("política one-shot recusa produção, kill switch aberto, expiração e destinatário externo", () => {
   const base = { environment: "staging", outboundDisabled: "true", confirmation: "SEND_ONE_META_MESSAGE", expiresAt: "2030-01-01T00:00:00Z", allowlist: "+55 11 99999-0000", recipient: "5511999990000", now: 1_800_000_000_000 };
   assert.equal(validateMetaPilotPolicy(base), "5511999990000");
