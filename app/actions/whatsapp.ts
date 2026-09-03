@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getPhoneVariants } from '@/lib/utils';
 import crypto from 'crypto';
 import { outboundDecision } from '@/lib/outbound-policy';
-import { bridgeLegacyOutboundSafely } from '@/lib/channels/evolution-bridge';
+import { executeEvolutionSend } from '@/lib/channels/evolution-send';
 
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
@@ -341,121 +341,7 @@ export async function sendWhatsAppMessage(
   mediaUrl: string | null = null
 ) {
   await requireProjectAccess(projectId);
-
-  const outbound = outboundDecision('EVOLUTION', messageType === 'TEXT' ? 'send-text' : 'send-media');
-  if (!outbound.allowed) throw new Error(outbound.reason);
-
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    include: { instance: true },
-  });
-
-  if (!conversation || conversation.instance.projectId !== projectId) {
-    throw new Error('Conversa não encontrada.');
-  }
-
-  const instance = conversation.instance;
-
-  // 1. Cria a mensagem no banco de dados local com o tipo e a URL da mídia informados
-  const message = await prisma.message.create({
-    data: {
-      content,
-      direction: 'OUTBOUND',
-      status: 'SENT',
-      messageType,
-      mediaUrl,
-      conversationId: conversation.id,
-    },
-  });
-
-  // Atualiza a conversa
-  await prisma.conversation.update({
-    where: { id: conversation.id },
-    data: { lastMessageAt: new Date() },
-  });
-
-  // 2. Envia via REST API da Evolution se for WhatsApp
-  if (EVOLUTION_API_URL && instance.type === 'WHATSAPP') {
-    try {
-      const cleanPhone = conversation.whatsappId.replace(/\D/g, '');
-      const apiKey = instance.token || EVOLUTION_API_KEY || '';
-
-      let endpoint = '';
-      const payload: any = {
-        number: cleanPhone,
-        options: {
-          delay: 1000,
-          presence: 'composing',
-          linkPreview: false,
-        },
-      };
-
-      if (messageType === 'TEXT') {
-        endpoint = `/message/sendText/${instance.instanceName}`;
-        payload.text = content;
-      } else {
-        endpoint = `/message/sendMedia/${instance.instanceName}`;
-        
-        let mediatype = 'document';
-        let mimetype = 'application/pdf';
-        if (messageType === 'IMAGE') {
-          mediatype = 'image';
-          mimetype = 'image/png';
-        } else if (messageType === 'AUDIO') {
-          mediatype = 'audio';
-          mimetype = 'audio/mp3';
-        } else if (messageType === 'VIDEO') {
-          mediatype = 'video';
-          mimetype = 'video/mp4';
-        }
-
-        if (mediaUrl) {
-          const ext = mediaUrl.split('.').pop()?.split('?')[0].toLowerCase();
-          if (ext === 'png') mimetype = 'image/png';
-          else if (ext === 'jpg' || ext === 'jpeg') mimetype = 'image/jpeg';
-          else if (ext === 'gif') mimetype = 'image/gif';
-          else if (ext === 'webp') mimetype = 'image/webp';
-          else if (ext === 'mp3') mimetype = 'audio/mpeg';
-          else if (ext === 'wav') mimetype = 'audio/wav';
-          else if (ext === 'ogg') mimetype = 'audio/ogg';
-          else if (ext === 'mp4') mimetype = 'video/mp4';
-          else if (ext === 'pdf') mimetype = 'application/pdf';
-        }
-
-        payload.mediatype = mediatype;
-        payload.mimetype = mimetype;
-        payload.caption = messageType === 'IMAGE' ? content : '';
-        payload.media = mediaUrl || '';
-        payload.fileName = content || (messageType === 'IMAGE' ? 'imagem.png' : messageType === 'AUDIO' ? 'audio.mp3' : 'documento.pdf');
-      }
-
-      const response = await fetch(`${EVOLUTION_API_URL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': apiKey,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.key?.id) {
-          await prisma.message.update({
-            where: { id: message.id },
-            data: { remoteId: result.key.id },
-          });
-        }
-        await bridgeLegacyOutboundSafely({ projectId, messageId: message.id, providerMessageId: result.key?.id || null, accepted: true });
-      } else {
-        await bridgeLegacyOutboundSafely({ projectId, messageId: message.id, accepted: false, errorCode: `HTTP_${response.status}` });
-        console.error('Erro ao enviar mensagem na Evolution API REST:', await response.text());
-      }
-    } catch (err) {
-      console.error('Erro de rede ao enviar mensagem via Evolution API:', err);
-    }
-  }
-
+  const message = await executeEvolutionSend({ projectId, conversationId, content, messageType, mediaUrl });
   revalidatePath(`/project/${projectId}/inbox`);
   return message;
 }

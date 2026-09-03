@@ -19,8 +19,6 @@ export async function ensureEvolutionConnection(db: Db, instance: WhatsAppInstan
       status: instance.archivedAt ? "ARCHIVED" : `LEGACY_${instance.status}`,
       isActive: false,
       archivedAt: instance.archivedAt,
-      credentialsEncrypted: null,
-      credentialsKeyId: null,
     },
     create: {
       projectId: instance.projectId,

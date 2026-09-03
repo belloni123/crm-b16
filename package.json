@@ -12,6 +12,7 @@
     "seed:staging": "tsx prisma/seed-staging.ts",
     "backfill:evolution": "tsx scripts/backfill-evolution-foundation.ts",
     "shadow:evolution": "tsx scripts/shadow-compare-evolution.ts",
+    "check:prisma-drift": "tsx scripts/check-prisma-drift.ts",
     "test:evolution-dual-write": "tsx scripts/test-evolution-dual-write.ts",
     "lint": "eslint",
     "test": "tsx --test tests/*.test.ts tests/omnichannel-foundation/*.test.ts"

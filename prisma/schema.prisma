@@ -300,7 +300,7 @@ model Conversation {
   leadId                   String?
   lead                     Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
   instanceId               String
-  instance                 WhatsAppInstance   @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  instance                 WhatsAppInstance   @relation(fields: [instanceId], references: [id], onDelete: Restrict)
   messages                 Message[]
   projectId                String?
   project                  Project?           @relation("ConversationProject", fields: [projectId], references: [id], onDelete: SetNull)
@@ -328,7 +328,7 @@ model Message {
   remoteId            String?
   content             String
   direction           String // "INBOUND" or "OUTBOUND"
-  status              String             @default("SENT") // "SENT", "DELIVERED", "READ"
+  status              String             @default("SENT") // "QUEUED", "SENDING", "ACCEPTED", "SENT", "DELIVERED", "READ", "FAILED"
   messageType         String             @default("TEXT") // "TEXT", "IMAGE", "DOCUMENT", "AUDIO"
   mediaUrl            String? // URL para arquivos de mídia
   senderName          String?

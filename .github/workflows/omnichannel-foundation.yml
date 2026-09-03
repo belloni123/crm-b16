@@ -6,6 +6,8 @@ on:
     branches:
       - feat/omnichannel-foundation-hardening
       - feat/evolution-compatibility-layer
+      - fix/pre-meta-readiness
+      - feat/meta-whatsapp-pilot
 
 jobs:
   validate:
@@ -47,6 +49,7 @@ jobs:
       META_WEBHOOK_VERIFY_TOKEN: synthetic-ci-verify-token
       META_APP_SECRET: synthetic-ci-app-secret
       EVOLUTION_FOUNDATION_WEBHOOK_SECRET: synthetic-ci-evolution-secret
+      EVOLUTION_WEBHOOK_SECRET: synthetic-ci-evolution-legacy-secret
       HEALTH_PORT: "3001"
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +61,7 @@ jobs:
       - run: npx tsx scripts/check-additive-migrations.ts
       - run: npx prisma validate
       - run: npx prisma migrate deploy
+      - run: npm run check:prisma-drift
       - run: npx prisma migrate deploy | tee /tmp/second-migrate.log
       - run: grep -q "No pending migrations" /tmp/second-migrate.log
       - run: ./scripts/verify-migration-history.sh

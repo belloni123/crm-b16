@@ -39,6 +39,20 @@ export function verifyHmacSha256(raw: Buffer, signature: string | null, secret: 
   return timingSafeEqual(Buffer.from(supplied, "hex"), Buffer.from(expected, "hex"));
 }
 
+export function timingSafeTextEqual(supplied: string | null, expected: string | undefined) {
+  if (!supplied || !expected) return false;
+  const left = Buffer.from(supplied);
+  const right = Buffer.from(expected);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+export function verifyEvolutionWebhookAuth(raw: Buffer, headers: Headers, secret: string | undefined) {
+  if (!secret) return false;
+  if (verifyHmacSha256(raw, headers.get("x-hub-signature-256"), secret)) return true;
+  const authorization = headers.get("webhook-authorization") || headers.get("apikey") || headers.get("authorization");
+  return timingSafeTextEqual(authorization?.replace(/^Bearer\s+/i, "") || null, secret);
+}
+
 export function clientOrigin(request: Request) {
   if (process.env.TRUST_PROXY !== "true") return "untrusted-proxy";
   const candidates = [request.headers.get("x-real-ip"), request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()];
