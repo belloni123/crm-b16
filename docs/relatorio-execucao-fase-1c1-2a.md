@@ -27,7 +27,8 @@ O piloto real não foi executado. O app ainda não possui `Config ID` de Faceboo
   - `77c7deb667526c7d88cd666b5b9188e2afbffa53` — foundation do piloto Meta WhatsApp;
   - `f0fade02a447eaaf029cc7ceba856a6f40aa7886` — alinhamento da migration Meta com o schema Prisma;
   - `fa1d4a1026ded3c9833dc88b1e312976b2c33b90` — unicidade na resolução de assets Meta;
-  - `f67af14d7cd8eef67c550a7a73dfc7d88183aa1b` — fechamento dos portões de segurança do piloto.
+  - `f67af14d7cd8eef67c550a7a73dfc7d88183aa1b` — fechamento dos portões de segurança do piloto;
+  - `05a75595ef71b930a21ee79ad8695e1c78297fba` — propagação explícita da configuração Meta para o runtime e teste de regressão do Compose.
 
 Não houve merge na `main`. O arquivo pessoal `PROMPT_REPLICAR_CRM_NOFRONTSCALE.md` permaneceu fora de todos os commits.
 
@@ -102,13 +103,13 @@ O PostgreSQL, a rede e o diretório temporários foram removidos depois da prova
 
 ### CI e deploy de staging
 
-A execução `33758113915` aprovou a Fase 1C.1. A execução final da Fase 2A, `33764008446`, aprovou:
+A execução `33758113915` aprovou a Fase 1C.1. A execução da foundation Meta `33764008446` e a execução final `33767832405` aprovaram:
 
 - PostgreSQL 15 e Redis 7;
 - scanner de migrations e `prisma validate`;
 - `migrate deploy` duas vezes;
 - portão de drift e checksums históricos;
-- 48 testes, 48 aprovados, zero omitidos na CI;
+- 49 testes, 49 aprovados, zero omitidos na CI;
 - TypeScript;
 - lint com 0 erros e 37 warnings preexistentes;
 - build Next.js 16.3.4;
@@ -223,7 +224,7 @@ Nenhum processo one-shot foi iniciado porque não existe conexão Meta validada,
 
 Recurso Coolify: `crm-b16-omnichannel-staging`  
 Branch: `feat/meta-whatsapp-pilot`  
-Commit publicado: `f67af14d7cd8eef67c550a7a73dfc7d88183aa1b`
+Commit funcional validado para publicação: `05a75595ef71b930a21ee79ad8695e1c78297fba`
 
 Estado validado:
 
