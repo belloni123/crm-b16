@@ -8,24 +8,25 @@ generator client {
 }
 
 model User {
-  id                    String                @id @default(uuid())
-  name                  String?
-  email                 String                @unique
-  passwordHash          String
-  role                  String                @default("USER") // "SUPERADMIN" or "USER"
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  resetToken            String?               @unique
-  resetTokenExpires     DateTime?
-  lgpdAccepted          Boolean               @default(false)
-  lgpdAcceptedAt        DateTime?
-  memberships           Membership[]
-  activities            Activity[]
-  assignedLeads         Lead[]                @relation("LeadAssignment")
-  calendarIntegrations  CalendarIntegration[]
-  tasks                 Task[]
-  assignedConversations Conversation[]        @relation("ConversationAssignment")
-  auditEvents           AuditEvent[]          @relation("AuditActor")
+  id                     String                  @id @default(uuid())
+  name                   String?
+  email                  String                  @unique
+  passwordHash           String
+  role                   String                  @default("USER") // "SUPERADMIN" or "USER"
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  resetToken             String?                 @unique
+  resetTokenExpires      DateTime?
+  lgpdAccepted           Boolean                 @default(false)
+  lgpdAcceptedAt         DateTime?
+  memberships            Membership[]
+  activities             Activity[]
+  assignedLeads          Lead[]                  @relation("LeadAssignment")
+  calendarIntegrations   CalendarIntegration[]
+  tasks                  Task[]
+  assignedConversations  Conversation[]          @relation("ConversationAssignment")
+  auditEvents            AuditEvent[]            @relation("AuditActor")
+  metaOnboardingSessions MetaOnboardingSession[]
 }
 
 model Project {
@@ -57,6 +58,9 @@ model Project {
   auditEvents              AuditEvent[]
   omnichannelConversations Conversation[]          @relation("ConversationProject")
   omnichannelMessages      Message[]               @relation("MessageProject")
+  metaOnboardingSessions   MetaOnboardingSession[]
+  channelTemplates         ChannelTemplate[]
+  messageDeliveryEvents    MessageDeliveryEvent[]
 }
 
 model Membership {
@@ -299,8 +303,8 @@ model Conversation {
   lastMessageAt            DateTime           @default(now())
   leadId                   String?
   lead                     Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  instanceId               String
-  instance                 WhatsAppInstance   @relation(fields: [instanceId], references: [id], onDelete: Restrict)
+  instanceId               String?
+  instance                 WhatsAppInstance?  @relation(fields: [instanceId], references: [id], onDelete: Restrict)
   messages                 Message[]
   projectId                String?
   project                  Project?           @relation("ConversationProject", fields: [projectId], references: [id], onDelete: SetNull)
@@ -324,21 +328,21 @@ model Conversation {
 }
 
 model Message {
-  id                  String             @id @default(uuid())
+  id                  String                 @id @default(uuid())
   remoteId            String?
   content             String
   direction           String // "INBOUND" or "OUTBOUND"
-  status              String             @default("SENT") // "QUEUED", "SENDING", "ACCEPTED", "SENT", "DELIVERED", "READ", "FAILED"
-  messageType         String             @default("TEXT") // "TEXT", "IMAGE", "DOCUMENT", "AUDIO"
+  status              String                 @default("SENT") // "QUEUED", "SENDING", "ACCEPTED", "SENT", "DELIVERED", "READ", "FAILED"
+  messageType         String                 @default("TEXT") // "TEXT", "IMAGE", "DOCUMENT", "AUDIO"
   mediaUrl            String? // URL para arquivos de mídia
   senderName          String?
   conversationId      String
-  conversation        Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  createdAt           DateTime           @default(now())
+  conversation        Conversation           @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt           DateTime               @default(now())
   projectId           String?
-  project             Project?           @relation("MessageProject", fields: [projectId], references: [id], onDelete: SetNull)
+  project             Project?               @relation("MessageProject", fields: [projectId], references: [id], onDelete: SetNull)
   channelConnectionId String?
-  channelConnection   ChannelConnection? @relation(fields: [channelConnectionId], references: [id], onDelete: SetNull)
+  channelConnection   ChannelConnection?     @relation(fields: [channelConnectionId], references: [id], onDelete: SetNull)
   providerMessageId   String?
   idempotencyKey      String?
   errorCode           String?
@@ -349,10 +353,11 @@ model Message {
   readAt              DateTime?
   failedAt            DateTime?
   replyToMessageId    String?
-  replyToMessage      Message?           @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
-  replies             Message[]          @relation("MessageReplies")
+  replyToMessage      Message?               @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies             Message[]              @relation("MessageReplies")
   mediaObjectId       String?
-  mediaObject         MediaObject?       @relation(fields: [mediaObjectId], references: [id], onDelete: SetNull)
+  mediaObject         MediaObject?           @relation(fields: [mediaObjectId], references: [id], onDelete: SetNull)
+  deliveryEvents      MessageDeliveryEvent[]
   metadata            String?
   updatedAt           DateTime?
 
@@ -409,13 +414,13 @@ model CalendarIntegration {
 }
 
 model ChannelConnection {
-  id                         String            @id @default(uuid())
+  id                         String                  @id @default(uuid())
   projectId                  String
-  project                    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project                    Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   provider                   String
   channel                    String
   name                       String
-  status                     String            @default("DISABLED")
+  status                     String                  @default("DISABLED")
   externalBusinessId         String?
   externalWabaId             String?
   externalPhoneNumberId      String?
@@ -428,16 +433,19 @@ model ChannelConnection {
   metadata                   String?
   lastHealthAt               DateTime?
   lastErrorCode              String?
-  isActive                   Boolean           @default(false)
+  isActive                   Boolean                 @default(false)
   archivedAt                 DateTime?
-  legacyWhatsAppInstanceId   String?           @unique
-  legacyWhatsAppInstance     WhatsAppInstance? @relation(fields: [legacyWhatsAppInstanceId], references: [id], onDelete: SetNull)
-  createdAt                  DateTime          @default(now())
-  updatedAt                  DateTime          @updatedAt
+  legacyWhatsAppInstanceId   String?                 @unique
+  legacyWhatsAppInstance     WhatsAppInstance?       @relation(fields: [legacyWhatsAppInstanceId], references: [id], onDelete: SetNull)
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
   contactIdentities          ContactIdentity[]
   providerEvents             ProviderEvent[]
   conversations              Conversation[]
   messages                   Message[]
+  metaOnboardingSessions     MetaOnboardingSession[]
+  channelTemplates           ChannelTemplate[]
+  messageDeliveryEvents      MessageDeliveryEvent[]
 
   @@index([projectId, provider, channel, isActive])
 }
@@ -573,6 +581,83 @@ model AuditEvent {
 
   @@index([projectId, createdAt])
   @@index([correlationId])
+}
+
+model MetaOnboardingSession {
+  id                  String             @id @default(uuid())
+  projectId           String
+  project             Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelConnectionId String?
+  channelConnection   ChannelConnection? @relation(fields: [channelConnectionId], references: [id], onDelete: SetNull)
+  stateHash           String
+  nonceHash           String
+  status              String             @default("PENDING")
+  expiresAt           DateTime
+  usedAt              DateTime?
+  errorCode           String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([projectId, userId, status, expiresAt])
+  @@index([expiresAt])
+}
+
+model ChannelTemplate {
+  id                  String            @id @default(uuid())
+  projectId           String
+  project             Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  channelConnectionId String
+  channelConnection   ChannelConnection @relation(fields: [channelConnectionId], references: [id], onDelete: Restrict)
+  providerTemplateId  String?
+  name                String
+  language            String
+  category            String
+  status              String
+  componentsJson      String
+  componentsHash      String
+  lastSyncedAt        DateTime
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@unique([channelConnectionId, name, language])
+  @@index([projectId, status, name])
+}
+
+model MessageDeliveryEvent {
+  id                  String            @id @default(uuid())
+  projectId           String
+  project             Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messageId           String?
+  message             Message?          @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  channelConnectionId String
+  channelConnection   ChannelConnection @relation(fields: [channelConnectionId], references: [id], onDelete: Restrict)
+  providerMessageId   String
+  providerStatus      String
+  providerTimestamp   DateTime?
+  externalEventKey    String
+  errorCode           String?
+  metadataRedacted    String?
+  appliedAt           DateTime?
+  createdAt           DateTime          @default(now())
+
+  @@unique([channelConnectionId, externalEventKey])
+  @@index([channelConnectionId, providerMessageId, createdAt])
+  @@index([projectId, messageId, createdAt])
+}
+
+model DataDeletionRequest {
+  id                 String    @id @default(uuid())
+  requesterEncrypted String
+  requesterHash      String
+  status             String    @default("RECEIVED")
+  source             String    @default("PUBLIC_FORM")
+  createdAt          DateTime  @default(now())
+  resolvedAt         DateTime?
+
+  @@index([requesterHash, createdAt])
+  @@index([status, createdAt])
 }
 
 model BackfillCheckpoint {

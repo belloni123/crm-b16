@@ -4,11 +4,11 @@ import type { ProviderAdapter } from "./types";
 export const metaWhatsAppProvider: ProviderAdapter = {
   provider: "META_WHATSAPP",
   capabilities: {
-    connect: false, inbound: false, freeformOutbound: false, templates: false,
-    campaigns: false, markAsRead: false, mediaTypes: [], requiresCustomerCareWindow: true,
+    connect: true, inbound: true, freeformOutbound: false, templates: true,
+    campaigns: false, markAsRead: false, mediaTypes: ["IMAGE", "DOCUMENT", "AUDIO", "VIDEO", "STICKER"], requiresCustomerCareWindow: true,
   },
   async dispatch() {
     assertOutboundDisabled();
-    return { status: "BLOCKED", reason: "META_WHATSAPP_DISABLED_IN_PHASE_1B" };
+    return { status: "BLOCKED", reason: "META_WHATSAPP_OUTBOUND_REQUIRES_ISOLATED_PILOT" };
   },
 };

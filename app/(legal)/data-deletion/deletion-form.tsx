@@ -1,0 +1,6 @@
+'use client';
+import { useState } from 'react';
+export function DeletionForm() {
+  const [result, setResult] = useState(''); const [busy, setBusy] = useState(false);
+  return <form className="mt-6 space-y-3" onSubmit={async (event) => { event.preventDefault(); setBusy(true); const form = new FormData(event.currentTarget); const response = await fetch('/api/data-deletion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: form.get('email') }) }); const body = await response.json(); setResult(response.ok ? `Solicitação registrada. Protocolo: ${body.reference}` : 'Não foi possível registrar a solicitação.'); setBusy(false); }}><label className="block text-sm font-bold text-white" htmlFor="deletion-email">E-mail para identificação</label><input id="deletion-email" name="email" required type="email" className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2"/><button disabled={busy} className="rounded-lg bg-emerald-400 px-4 py-2 font-bold text-black disabled:opacity-50">{busy ? 'Registrando…' : 'Registrar solicitação'}</button>{result && <p role="status" className="rounded-lg border border-white/10 p-3">{result}</p>}</form>;
+}

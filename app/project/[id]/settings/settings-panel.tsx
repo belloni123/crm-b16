@@ -41,6 +41,7 @@ import {
 } from '@/app/actions/calendar';
 import { Calendar } from 'lucide-react';
 import { WebhookSettings, type WebhookSettingsCustomField } from './webhook-settings';
+import { MetaWhatsAppSettings } from './meta-whatsapp-settings';
 import { 
   Settings, 
   Layers, 
@@ -2003,9 +2004,10 @@ ${fieldsHtml}
         {/* ABA 7: CONEXÕES WHATSAPP */}
         {activeTab === 'whatsapp' && (
           <div className="space-y-6">
+            <MetaWhatsAppSettings projectId={projectId} isAdmin={isAdmin} baseUrl={baseUrl} />
             <div>
-              <h2 className="text-md font-bold text-white font-display mb-1">Gerenciamento de Canais WhatsApp</h2>
-              <p className="text-xs text-text-secondary">Cadastre instâncias da Evolution API para parear números de atendimento e chats no CRM.</p>
+              <h2 className="text-md font-bold text-white font-display mb-1">Evolution API — legado preservado</h2>
+              <p className="text-xs text-text-secondary">As instâncias atuais continuam disponíveis para atendimento e histórico, sem alteração do fluxo existente.</p>
             </div>
 
             {/* Form */}

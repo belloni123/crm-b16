@@ -8,7 +8,7 @@ import { structuredLog } from "@/lib/observability";
 export type DispatchResult = { claimed: number; published: number; retried: number; deadLettered: number; recoveredExpiredLeases: number };
 
 type QueuePublisher = {
-  add: (name: string, data: Record<string, unknown>, options: { jobId: string }) => Promise<unknown>;
+  add: (name: string, data: Record<string, unknown>, options: { jobId: string; attempts?: number; backoff?: { type: "exponential"; delay: number }; removeOnComplete?: number }) => Promise<unknown>;
   close: () => Promise<void>;
 };
 
@@ -81,7 +81,7 @@ export async function dispatchOutboxBatch(limit = 25, options: DispatchOptions =
       if (!isQueueName(event.targetQueue)) throw new Error("UNKNOWN_TARGET_QUEUE");
       const queue = queueFactory(event.targetQueue);
       try {
-        await queue.add(event.eventType, { outboxEventId: event.id, projectId: event.projectId }, { jobId: event.id });
+        await queue.add(event.eventType, { outboxEventId: event.id, projectId: event.projectId }, { jobId: event.id, attempts: event.maxAttempts, backoff: { type: "exponential", delay: 1000 }, removeOnComplete: 1000 });
       } finally { await queue.close(); }
       await prisma.outboxEvent.updateMany({ where: { id: event.id, status: "PROCESSING", lockedBy: workerId }, data: { status: "PUBLISHED", publishedAt: new Date(), lockedAt: null, lockedBy: null, lockedUntil: null, lastErrorCode: null } });
       result.published += 1;

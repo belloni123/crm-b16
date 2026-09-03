@@ -9,9 +9,10 @@ const protectedTables = [
   "ChannelConnection", "ContactIdentity", "ProviderEvent", "OutboxEvent",
   "MediaObject", "ProjectFeature", "AuditEvent",
   "BackfillCheckpoint",
+  "MetaOnboardingSession", "ChannelTemplate", "MessageDeliveryEvent", "DataDeletionRequest",
 ] as const;
 
-const foundationTables = new Set(["ChannelConnection", "ContactIdentity", "ProviderEvent", "OutboxEvent", "MediaObject", "ProjectFeature", "AuditEvent", "BackfillCheckpoint"]);
+const foundationTables = new Set(["ChannelConnection", "ContactIdentity", "ProviderEvent", "OutboxEvent", "MediaObject", "ProjectFeature", "AuditEvent", "BackfillCheckpoint", "MetaOnboardingSession", "ChannelTemplate", "MessageDeliveryEvent", "DataDeletionRequest"]);
 const selectedTables = process.env.INVARIANT_PROFILE === "commercial"
   ? protectedTables.filter((table) => !foundationTables.has(table))
   : protectedTables;

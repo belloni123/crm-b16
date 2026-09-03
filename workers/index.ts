@@ -8,6 +8,7 @@ import { outboundDecision } from "@/lib/outbound-policy";
 import { createFoundationQueue } from "@/lib/queues";
 import { EVOLUTION_INBOUND_RETRY, EVOLUTION_OUTBOUND_RETRY } from "@/lib/channels/evolution-bridge";
 import { markEvolutionRetryDeadLetter, processEvolutionRetryOutbox } from "@/lib/channels/evolution-retry";
+import { processMetaProviderEvent } from "@/lib/channels/meta/processor";
 
 validateServiceEnvironment("worker");
 const redis = createRedisConnection();
@@ -24,7 +25,15 @@ const providerEventsWorker = new Worker("provider-events", async (job) => {
       }
       return result;
     }
-    if (!["PROVIDER_EVENT_RECEIVED", "EVOLUTION_DUAL_WRITE"].includes(job.name)) throw new Error("UNKNOWN_PROVIDER_EVENT_JOB");
+    if (job.name === "PROVIDER_EVENT_RECEIVED") {
+      const outbox = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: job.data.outboxEventId } });
+      const payload = JSON.parse(outbox.payload) as { providerEventId?: string };
+      if (!payload.providerEventId) throw new Error("MISSING_PROVIDER_EVENT_ID");
+      const event = await prisma.providerEvent.findUniqueOrThrow({ where: { id: payload.providerEventId }, select: { provider: true } });
+      if (event.provider === "META_WHATSAPP") return processMetaProviderEvent(payload.providerEventId, `bullmq-${job.id}`);
+      return { status: "RECORDED" };
+    }
+    if (job.name !== "EVOLUTION_DUAL_WRITE") throw new Error("UNKNOWN_PROVIDER_EVENT_JOB");
     return { status: "RECORDED" };
   }, workerOptions());
 

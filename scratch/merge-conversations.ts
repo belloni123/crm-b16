@@ -28,6 +28,7 @@ async function main() {
   // Group conversations by instanceId
   const conversationsByInstance = new Map<string, typeof conversations>();
   for (const c of conversations) {
+    if (!c.instanceId) continue;
     const list = conversationsByInstance.get(c.instanceId) || [];
     list.push(c);
     conversationsByInstance.set(c.instanceId, list);

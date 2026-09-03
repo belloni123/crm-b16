@@ -1,0 +1,1 @@
+export default function MetaCallbackPage() { return <><h1 className="mb-6 text-3xl font-bold text-white">Conexão com a Meta</h1><p>O retorno de autorização foi recebido. Volte à janela do CLAVE CRM para concluir a conexão. Nenhum token é exibido nesta página.</p></> }

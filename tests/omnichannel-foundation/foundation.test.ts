@@ -36,7 +36,8 @@ test("capabilities de campanhas permanecem desligadas", () => {
   assert.equal(getProvider("EVOLUTION").capabilities.campaigns, false);
   assert.equal(getProvider("META_INSTAGRAM").capabilities.campaigns, false);
   assert.equal(getProvider("META_WHATSAPP").capabilities.campaigns, false);
-  assert.equal(getProvider("META_WHATSAPP").capabilities.connect, false);
+  assert.equal(getProvider("META_WHATSAPP").capabilities.connect, true);
+  assert.equal(getProvider("META_WHATSAPP").capabilities.templates, true);
 });
 
 test("kill switch bloqueia todos os adapters", async () => {

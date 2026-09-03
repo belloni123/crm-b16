@@ -323,7 +323,7 @@ export async function getWhatsAppMessages(projectId: string, conversationId: str
     include: { instance: true },
   });
 
-  if (!conversation || conversation.instance.projectId !== projectId) {
+  if (!conversation || (conversation.projectId || conversation.instance?.projectId) !== projectId) {
     throw new Error('Conversa não encontrada.');
   }
 
@@ -354,7 +354,7 @@ export async function associateLeadToConversation(projectId: string, conversatio
     include: { instance: true },
   });
 
-  if (!conversation || conversation.instance.projectId !== projectId) {
+  if (!conversation || (conversation.projectId || conversation.instance?.projectId) !== projectId) {
     throw new Error('Conversa não encontrada.');
   }
 

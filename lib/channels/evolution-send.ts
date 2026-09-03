@@ -34,7 +34,7 @@ function failureCode(error: unknown) {
 export async function executeEvolutionSend(input: SendInput, dependencies: SendDependencies = {}) {
   assertOutboundAllowed("EVOLUTION", input.messageType === "TEXT" ? "send-text" : "send-media");
   const conversation = await prisma.conversation.findUnique({ where: { id: input.conversationId }, include: { instance: true } });
-  if (!conversation || conversation.instance.projectId !== input.projectId) throw new Error("CONVERSATION_NOT_FOUND");
+  if (!conversation || !conversation.instance || conversation.instance.projectId !== input.projectId) throw new Error("CONVERSATION_NOT_FOUND");
   if (conversation.instance.type !== "WHATSAPP") throw new Error("EVOLUTION_INSTANCE_INVALID");
   const apiUrl = (dependencies.apiUrl ?? process.env.EVOLUTION_API_URL)?.replace(/\/$/, "");
   const apiKey = conversation.instance.token || dependencies.globalApiKey || process.env.EVOLUTION_API_KEY;

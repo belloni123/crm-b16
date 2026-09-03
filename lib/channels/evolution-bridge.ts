@@ -56,11 +56,12 @@ export async function bridgeLegacyInbound(input: InboundInput) {
   const message = await prisma.message.findUnique({ where: { id: input.messageId }, include: { conversation: { include: { instance: true } } } });
   if (!message) throw new Error("EVOLUTION_BRIDGE_MESSAGE_NOT_FOUND");
   if (message.direction !== "INBOUND") throw new Error("EVOLUTION_BRIDGE_DIRECTION_MISMATCH");
-  if (message.conversationId !== input.conversationId || message.conversation.instanceId !== input.instanceId) throw new Error("EVOLUTION_BRIDGE_SCOPE_MISMATCH");
-  if (message.conversation.instance.projectId !== input.projectId) throw new Error("EVOLUTION_BRIDGE_PROJECT_MISMATCH");
+  if (message.conversationId !== input.conversationId || message.conversation.instanceId !== input.instanceId || !message.conversation.instance) throw new Error("EVOLUTION_BRIDGE_SCOPE_MISMATCH");
+  const instance = message.conversation.instance;
+  if (instance.projectId !== input.projectId) throw new Error("EVOLUTION_BRIDGE_PROJECT_MISMATCH");
   if (!(await dualWriteEnabled(input.projectId))) return { status: "DISABLED" as const };
   await prisma.$transaction(async (tx) => {
-    await linkLegacyMessage(tx, message.conversation.instance, message.conversation, message);
+    await linkLegacyMessage(tx, instance, message.conversation, message);
     await auditOnce(tx, { projectId: input.projectId, action: "EVOLUTION_DUAL_WRITE_INBOUND", messageId: message.id, metadataRedacted: JSON.stringify({ latencyMs: Date.now() - startedAt }) });
   });
   return { status: "LINKED" as const, latencyMs: Date.now() - startedAt };
@@ -71,10 +72,12 @@ export async function bridgeLegacyOutboundResult(input: OutboundInput) {
   const message = await prisma.message.findUnique({ where: { id: input.messageId }, include: { conversation: { include: { instance: true } } } });
   if (!message) throw new Error("EVOLUTION_BRIDGE_MESSAGE_NOT_FOUND");
   if (message.direction !== "OUTBOUND") throw new Error("EVOLUTION_BRIDGE_DIRECTION_MISMATCH");
-  if (message.conversation.instance.projectId !== input.projectId) throw new Error("EVOLUTION_BRIDGE_PROJECT_MISMATCH");
+  if (!message.conversation.instance) throw new Error("EVOLUTION_BRIDGE_SCOPE_MISMATCH");
+  const instance = message.conversation.instance;
+  if (instance.projectId !== input.projectId) throw new Error("EVOLUTION_BRIDGE_PROJECT_MISMATCH");
   if (!(await dualWriteEnabled(input.projectId))) return { status: "DISABLED" as const };
   await prisma.$transaction(async (tx) => {
-    await linkLegacyMessage(tx, message.conversation.instance, message.conversation, message);
+    await linkLegacyMessage(tx, instance, message.conversation, message);
     await tx.message.update({
       where: { id: message.id },
       data: input.accepted
