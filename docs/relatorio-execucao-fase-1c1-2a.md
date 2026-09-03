@@ -11,7 +11,7 @@ A Fase 1C.1 foi aprovada integralmente antes do início da Fase 2A. O schema e o
 
 Na Fase 2A, o código do piloto Meta WhatsApp foi implementado, testado e publicado somente em staging. O staging possui HTTPS válida, páginas legais, Embedded Signup, cofre de tokens, cliente Graph, sincronização de templates, gateway e processamento real de webhooks, interface administrativa e envio one-shot. O app Meta existente **Clave** foi auditado até os limites do acesso disponível.
 
-O piloto real não foi executado. O app ainda não possui `Config ID` de Facebook Login for Business/Embedded Signup e a auditoria do Business Portfolio foi interrompida pela confirmação de identidade por chave de acesso. Como o onboarding real não foi concluído, todas as feature flags terminam desligadas e zero mensagens oficiais foram enviadas. Não houve tentativa de improvisar credencial, WABA, número ou destinatário.
+O Config ID oficial de Facebook Login for Business/Embedded Signup foi criado no app existente, registrado no staging e validado até o popup real da Meta. O onboarding não foi concluído porque a própria Meta respondeu **“Agência B16 não pode integrar clientes no momento”** depois da confirmação da conta. Nenhum token foi emitido ou armazenado, nenhuma conexão real foi criada, todas as feature flags terminam desligadas e zero mensagens oficiais foram enviadas.
 
 ## Branches e commits
 
@@ -28,7 +28,8 @@ O piloto real não foi executado. O app ainda não possui `Config ID` de Faceboo
   - `f0fade02a447eaaf029cc7ceba856a6f40aa7886` — alinhamento da migration Meta com o schema Prisma;
   - `fa1d4a1026ded3c9833dc88b1e312976b2c33b90` — unicidade na resolução de assets Meta;
   - `f67af14d7cd8eef67c550a7a73dfc7d88183aa1b` — fechamento dos portões de segurança do piloto;
-  - `05a75595ef71b930a21ee79ad8695e1c78297fba` — propagação explícita da configuração Meta para o runtime e teste de regressão do Compose.
+  - `05a75595ef71b930a21ee79ad8695e1c78297fba` — propagação explícita da configuração Meta para o runtime e teste de regressão do Compose;
+  - `3040dda86e766f4a94e7974f55b8d0590feef204` — relatório consolidado das fases 1C.1 e 2A, publicado no staging antes da configuração externa.
 
 Não houve merge na `main`. O arquivo pessoal `PROMPT_REPLICAR_CRM_NOFRONTSCALE.md` permaneceu fora de todos os commits.
 
@@ -103,7 +104,7 @@ O PostgreSQL, a rede e o diretório temporários foram removidos depois da prova
 
 ### CI e deploy de staging
 
-A execução `33758113915` aprovou a Fase 1C.1. A execução da foundation Meta `33764008446` e a execução final `33767832405` aprovaram:
+A execução `33758113915` aprovou a Fase 1C.1. A execução da foundation Meta `33764008446` e as execuções finais `33767832405` e `33768083242` aprovaram:
 
 - PostgreSQL 15 e Redis 7;
 - scanner de migrations e `prisma validate`;
@@ -138,18 +139,23 @@ O sample foi usado somente como referência de fluxo; não foi copiado integralm
 - Business ID: `142145626207971`;
 - modo: publicado/Live;
 - função da conta autenticada: Administrator;
-- casos de uso existentes: Instagram Business e Pages API;
+- casos de uso existentes: Instagram Business, Pages API e WhatsApp Business Messaging;
 - Facebook Login for Business: presente;
-- configurações de Login for Business: nenhuma (`Config ID` inexistente);
-- produto WhatsApp: ainda não configurado no app;
-- permissões WhatsApp/Advanced Access/App Review: ainda não comprovadas;
-- `App Domains`: apenas `clave.agenciab16.com.br` no estado auditado;
-- redirect URI existente: `https://clave.agenciab16.com.br/instagram/conectar`;
-- Allowed Domains for JavaScript SDK: vazio;
+- configuração criada a partir do modelo oficial **Cadastro incorporado do WhatsApp com token de expiração em 60 dias**;
+- Config ID: `1433334801971564`;
+- assets permitidos pela configuração: contas do WhatsApp, com tarefas de gerenciamento, desenvolvimento, templates e telefone;
+- permissões da configuração: `whatsapp_business_management` e `whatsapp_business_messaging`;
+- App Review/Advanced Access: não submetidos nesta fase, conforme restrição expressa;
+- `App Domains`: `clave.agenciab16.com.br` e `mawcghq4zbnnzmbxmvby6fal.147.93.15.68.sslip.io`;
+- redirects válidos: `https://clave.agenciab16.com.br/instagram/conectar` e `https://mawcghq4zbnnzmbxmvby6fal.147.93.15.68.sslip.io/meta/callback`;
+- Allowed Domains for JavaScript SDK: `mawcghq4zbnnzmbxmvby6fal.147.93.15.68.sslip.io`;
+- OAuth Web, OAuth Client, modo estrito, HTTPS e JavaScript SDK Login: habilitados;
 - política de privacidade existente: `https://clave.agenciab16.com.br/privacidade`;
 - termos existentes: `https://clave.agenciab16.com.br/termos`;
 - exclusão existente: `https://clave.agenciab16.com.br/instagram/exclusao-de-dados`;
-- WABAs, números, pagamento, qualidade, templates e recipients de teste: não acessíveis/confirmados antes do desbloqueio do Business Portfolio.
+- ativos expostos pela Configuração da API: WABA `1077385971231520` e Phone Number ID `815938538264892` (número mascarado no relatório);
+- inventário do negócio: quatro números de produção e um número de teste informados pela Meta; nenhuma seleção, registro ou envio foi realizado;
+- alerta da Meta: forma de pagamento ausente em sete contas; qualidade, templates e recipients autorizados não foram alterados nem validados para envio.
 
 Permissões mínimas preparadas no código e na matriz de validação:
 
@@ -188,6 +194,8 @@ A migration aditiva `20260903140000_meta_whatsapp_pilot` cria:
 
 A interface `Configurações > Canais > WhatsApp oficial` é restrita a `PROJECT_ADMIN`. O SDK é carregado somente nessa tela, usa `config_id`, `response_type=code`, `override_default_response_type=true` e `extras.sessionInfoVersion` configurável. O cliente não recebe App Secret e não persiste token em `localStorage`.
 
+O Config ID `1433334801971564` foi cadastrado em `META_CONFIG_ID` apenas no recurso de staging do Coolify. Depois do redeploy, o botão abriu o popup oficial `facebook.com/v24.0/dialog/oauth` com o App ID, Config ID, domínio, `response_type=code` e versão de sessão esperados. A confirmação da conta avançou corretamente até o portão de elegibilidade da Meta, sem devolver code e sem criar token.
+
 No servidor, o fluxo valida membership, projeto, state, nonce, expiração e replay; troca code por token; valida App ID, expiração, scopes e granular scopes da WABA; identifica Business/WABA/Phone; verifica status do número e subscription; cifra o token com AES-256-GCM e AAD; nunca retorna o token ao browser; e só marca a conexão como ativa depois de todos os portões.
 
 ### Cliente Graph, templates e desconexão
@@ -208,6 +216,8 @@ O worker valida projeto, adquire lease, descriptografa `ProviderEvent` com AAD, 
 
 Status `ACCEPTED`, `SENT`, `DELIVERED`, `READ`, `FAILED` e `DELETED` são monotônicos. Status recebido antes da mensagem permanece pendente para correlação. Cada aplicação idempotente gera `MessageDeliveryEvent` com timestamp e erro redigido.
 
+No painel Meta, o callback de staging foi validado com o verify token próprio do ambiente e o campo `messages` foi assinado explicitamente em `v26.0`. Os demais campos permaneceram sem assinatura. O verify token não foi reproduzido em log ou documentação.
+
 ### Envio unitário
 
 `scripts/meta/send-pilot-message.ts` recusa produção, exige staging, projeto/conexão, confirmação explícita, expiração e destinatário allowlisted. Faz dry-run, limita a uma mensagem, usa somente valores sintéticos, passa por `QUEUED`/`SENDING`, aceita apenas resposta Graph válida e não repete POST automaticamente.
@@ -224,7 +234,7 @@ Nenhum processo one-shot foi iniciado porque não existe conexão Meta validada,
 
 Recurso Coolify: `crm-b16-omnichannel-staging`  
 Branch: `feat/meta-whatsapp-pilot`  
-Commit funcional validado para publicação: `05a75595ef71b930a21ee79ad8695e1c78297fba`
+Commit publicado e validado: `3040dda86e766f4a94e7974f55b8d0590feef204`
 
 Estado validado:
 
@@ -241,18 +251,20 @@ Estado validado:
 - webhook GET com token incorreto: `403`;
 - webhook POST sem HMAC/válido incorreto: bloqueado antes do domínio.
 
+O redeploy posterior à configuração externa terminou com status `Success` em `08m31s`. A verificação pública final retornou `status=healthy`, versão `3040dda86e766f4a94e7974f55b8d0590feef204`, PostgreSQL/Redis/worker/scheduler saudáveis, `OUTBOUND_INTEGRATIONS_DISABLED=true`, zero features habilitadas e zero jobs pendentes ou em DLQ.
+
 Como o onboarding real não terminou, `omnichannel_foundation`, `meta_whatsapp`, `campaigns`, `automations`, `meta_instagram`, `realtime_inbox`, `object_storage` e `evolution_dual_write` permanecem `false` em todos os projetos.
 
 ### Bloqueios externos e ponto de retomada
 
-#### 1. Confirmação para criar a configuração OAuth
+#### 1. Elegibilidade para integrar clientes
 
-- ação preparada: clicar em `Criar configuração` em Facebook Login for Business para gerar o `Config ID` do Embedded Signup;
-- ferramenta: painel autenticado Meta for Developers, app Clave;
-- estado observado: nenhuma configuração existente;
-- recurso ausente: confirmação imediata do usuário para criar uma configuração OAuth persistente;
-- alternativa segura avaliada: não existe `Config ID` reutilizável e criar outro app é expressamente proibido;
-- retomada: criar a configuração no app existente, adicionar apenas os redirect/domínios de staging, registrar o `META_CONFIG_ID` no Coolify e redeployar staging.
+- ação tentada: executar o Embedded Signup real pelo CRM de staging após criar e publicar a configuração OAuth;
+- ferramentas: CRM de staging, Facebook JavaScript SDK e popup autenticado Facebook Login for Business;
+- erro exato: **“Agência B16 não pode integrar clientes no momento”**;
+- recurso ausente: liberação da Agência B16 como Tech Provider capaz de integrar clientes; a documentação oficial da Meta também condiciona a liberação pública a App Review e Advanced Access;
+- alternativa segura avaliada: gerar token temporário pelo console desviaria do code exchange do servidor e não resolveria a elegibilidade; criar outro app é proibido; App Review é expressamente proibido nesta fase;
+- retomada: concluir fora desta fase a habilitação/verificação de Tech Provider e, quando houver autorização específica, App Review/Advanced Access; então repetir o mesmo botão `Conectar com a Meta` no projeto sintético.
 
 #### 2. Reautenticação do Business Portfolio
 
@@ -263,7 +275,7 @@ Como o onboarding real não terminou, `omnichannel_foundation`, `meta_whatsapp`,
 - alternativa segura avaliada: `Try another method` não ofereceu método utilizável; não há bypass seguro ou autorizado;
 - retomada: o usuário confirma a identidade, a auditoria de Business/WABA/Phone continua e somente ativos próprios/de teste podem ser selecionados.
 
-Sem esses dois passos não é seguro validar token real, conectar WABA, inscrever a app, sincronizar templates reais, habilitar as duas flags do projeto sintético ou enviar a mensagem piloto.
+Sem esses portões externos não é seguro validar token real, conectar a WABA, inscrever a app na WABA, sincronizar templates reais, habilitar as duas flags do projeto sintético ou enviar a mensagem piloto.
 
 ### App Review e backup externo
 
