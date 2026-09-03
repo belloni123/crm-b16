@@ -4,6 +4,7 @@ import { recordProviderEvent } from "@/lib/channels/events";
 import { allowWebhookRequest, clientOrigin, correlationId, parseWebhookJson, readRawBody, verifyHmacSha256 } from "@/lib/channels/webhook-gateway";
 import { createRedisConnection } from "@/lib/queues/connection";
 import { eachMetaChange, metaChangeKey, type MetaWebhookPayload } from "@/lib/channels/meta/payload";
+import { structuredLog } from "@/lib/observability";
 
 export const runtime = "nodejs";
 
@@ -47,7 +48,13 @@ export async function POST(request: Request) {
         });
         if (connections.length > 1) return Response.json({ error: "AMBIGUOUS_META_CONNECTION", correlation }, { status: 409 });
         const connection = connections[0];
-        if (!connection) { unknown += 1; continue; }
+        if (!connection) {
+          unknown += 1;
+          structuredLog("warn", "meta.webhook.unknown-asset", { correlation, assetHash: metaChangeKey(entry.id, { metadata: { phone_number_id: phoneNumberId } }, 0, 0) });
+          continue;
+        }
+        const enabled = await prisma.projectFeature.count({ where: { projectId: connection.projectId, enabled: true, key: { in: ["omnichannel_foundation", "meta_whatsapp"] } } });
+        if (enabled !== 2) { unknown += 1; continue; }
         const connectionLimit = await allowWebhookRequest(redis, "meta", "connection", connection.id, Number(process.env.WEBHOOK_RATE_LIMIT_CONNECTION || 600));
         if (!connectionLimit.allowed) return Response.json({ error: connectionLimit.code, correlation }, { status: connectionLimit.code === "RATE_LIMITED" ? 429 : 503, headers: { "retry-after": String(connectionLimit.retryAfterSeconds) } });
         const normalized = Buffer.from(JSON.stringify({ entryId: entry.id, change }));

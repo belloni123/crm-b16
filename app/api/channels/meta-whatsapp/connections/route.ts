@@ -13,11 +13,15 @@ export async function GET(request: Request) {
       const capabilities = row.capabilitiesSnapshot ? JSON.parse(row.capabilitiesSnapshot) : {};
       return {
         id: row.id, name: row.name, status: row.status, isActive: row.isActive,
+        businessIdMasked: row.externalBusinessId ? `***${row.externalBusinessId.slice(-4)}` : null,
         wabaIdMasked: row.externalWabaId ? `***${row.externalWabaId.slice(-4)}` : null,
         phoneNumberIdMasked: row.externalPhoneNumberId ? `***${row.externalPhoneNumberId.slice(-4)}` : null,
         displayPhoneMasked: metadata.displayPhoneMasked || null,
         qualityRating: capabilities.qualityRating || null, phoneStatus: capabilities.phoneStatus || null,
-        lastHealthAt: row.lastHealthAt, lastErrorCode: row.lastErrorCode, templates: row.channelTemplates,
+        tokenStatus: !row.credentialsEncrypted ? "ABSENT" : row.tokenExpiresAt && row.tokenExpiresAt <= new Date() ? "EXPIRED" : "VALID",
+        lastHealthAt: row.lastHealthAt, lastErrorCode: row.lastErrorCode,
+        lastTemplateSyncAt: row.channelTemplates.reduce<Date | null>((latest, item) => !latest || item.lastSyncedAt > latest ? item.lastSyncedAt : latest, null),
+        templates: row.channelTemplates,
       };
     }), { headers: { "cache-control": "no-store" } });
   } catch { return Response.json({ error: "FORBIDDEN" }, { status: 403 }); }

@@ -29,7 +29,8 @@ const providerEventsWorker = new Worker("provider-events", async (job) => {
       const outbox = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: job.data.outboxEventId } });
       const payload = JSON.parse(outbox.payload) as { providerEventId?: string };
       if (!payload.providerEventId) throw new Error("MISSING_PROVIDER_EVENT_ID");
-      const event = await prisma.providerEvent.findUniqueOrThrow({ where: { id: payload.providerEventId }, select: { provider: true } });
+      const event = await prisma.providerEvent.findUniqueOrThrow({ where: { id: payload.providerEventId }, select: { provider: true, projectId: true } });
+      if (event.projectId !== outbox.projectId || event.projectId !== job.data.projectId) throw new Error("PROVIDER_EVENT_PROJECT_MISMATCH");
       if (event.provider === "META_WHATSAPP") return processMetaProviderEvent(payload.providerEventId, `bullmq-${job.id}`);
       return { status: "RECORDED" };
     }
@@ -38,6 +39,19 @@ const providerEventsWorker = new Worker("provider-events", async (job) => {
   }, workerOptions());
 
 providerEventsWorker.on("failed", async (job) => {
+  if (job?.name === "PROVIDER_EVENT_RECEIVED") {
+    const maxAttempts = typeof job.opts.attempts === "number" ? job.opts.attempts : 1;
+    if (job.attemptsMade < maxAttempts) return;
+    const outboxEventId = job.data.outboxEventId as string | undefined;
+    if (!outboxEventId) return;
+    const outbox = await prisma.outboxEvent.findUnique({ where: { id: outboxEventId } });
+    const providerEventId = outbox ? (JSON.parse(outbox.payload) as { providerEventId?: string }).providerEventId : undefined;
+    if (providerEventId) await prisma.providerEvent.updateMany({ where: { id: providerEventId, status: { not: "PROCESSED" } }, data: { status: "DEAD_LETTER", lastErrorCode: "META_PROCESSING_MAX_ATTEMPTS" } });
+    const queue = createFoundationQueue("dead-letter");
+    try { await queue.add("META_PROVIDER_EVENT_DEAD_LETTER", { outboxEventId, projectId: job.data.projectId, errorCode: "META_PROCESSING_MAX_ATTEMPTS" }, { jobId: `meta-dlq-${outboxEventId}` }); }
+    finally { await queue.close(); }
+    return;
+  }
   if (!job || ![EVOLUTION_INBOUND_RETRY, EVOLUTION_OUTBOUND_RETRY].includes(job.name)) return;
   const maxAttempts = typeof job.opts.attempts === "number" ? job.opts.attempts : 1;
   if (job.attemptsMade < maxAttempts) return;

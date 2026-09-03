@@ -3,8 +3,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 type MetaConnection = {
-  id: string; name: string; status: string; isActive: boolean; wabaIdMasked: string | null; phoneNumberIdMasked: string | null;
-  displayPhoneMasked: string | null; qualityRating: string | null; phoneStatus: string | null; lastHealthAt: string | null; lastErrorCode: string | null;
+  id: string; name: string; status: string; isActive: boolean; businessIdMasked: string | null; wabaIdMasked: string | null; phoneNumberIdMasked: string | null;
+  displayPhoneMasked: string | null; qualityRating: string | null; phoneStatus: string | null; tokenStatus: string; lastHealthAt: string | null; lastTemplateSyncAt: string | null; lastErrorCode: string | null;
   templates: Array<{ id: string; name: string; language: string; category: string; status: string; lastSyncedAt: string }>;
 };
 
@@ -55,7 +55,7 @@ export function MetaWhatsAppSettings({ projectId, isAdmin, baseUrl }: { projectI
       };
       window.addEventListener('message', listener);
       try {
-        const authPromise = new Promise<string>((resolve, reject) => fb.login((response) => response.authResponse?.code ? resolve(response.authResponse.code) : reject(new Error('Onboarding cancelado ou sem code')), { config_id: session.configId, response_type: 'code', override_default_response_type: true, extras: { setup: {}, sessionInfoVersion: '3' } }));
+        const authPromise = new Promise<string>((resolve, reject) => fb.login((response) => response.authResponse?.code ? resolve(response.authResponse.code) : reject(new Error('Onboarding cancelado ou sem code')), { config_id: session.configId, response_type: 'code', override_default_response_type: true, extras: { setup: {}, sessionInfoVersion: session.sessionInfoVersion } }));
         const [code, assets] = await Promise.all([authPromise, Promise.race([assetsPromise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('A Meta não retornou WABA e número')), 120_000))])]);
         await jsonRequest('/api/channels/meta-whatsapp/complete', { method: 'POST', body: JSON.stringify({ projectId, sessionId: session.sessionId, state: session.state, nonce: session.nonce, code, ...assets }) });
         setNotice('WhatsApp oficial conectado com segurança.');
@@ -90,7 +90,8 @@ export function MetaWhatsAppSettings({ projectId, isAdmin, baseUrl }: { projectI
     {notice && <p role="status" className="rounded-lg border border-border-subtle bg-bg-base p-3 text-xs text-white">{notice}</p>}
     {connections.map((connection) => <div key={connection.id} className="rounded-xl border border-border-subtle bg-glass-2 p-4 text-xs space-y-3">
       <div className="flex flex-wrap items-center gap-3"><strong className="text-white">{connection.name}</strong><span className={connection.isActive ? 'text-emerald-400' : 'text-text-tertiary'}>{connection.isActive ? 'CONECTADO' : 'ARQUIVADO'}</span><span className="ml-auto text-text-secondary">{connection.displayPhoneMasked || 'número mascarado'}</span></div>
-      <div className="grid gap-2 text-[10px] text-text-secondary sm:grid-cols-3"><span>WABA {connection.wabaIdMasked}</span><span>Phone ID {connection.phoneNumberIdMasked}</span><span>Qualidade {connection.qualityRating || 'não informada'}</span></div>
+      <div className="grid gap-2 text-[10px] text-text-secondary sm:grid-cols-4"><span>Business {connection.businessIdMasked || 'não informado'}</span><span>WABA {connection.wabaIdMasked}</span><span>Phone ID {connection.phoneNumberIdMasked}</span><span>Qualidade {connection.qualityRating || 'não informada'}</span></div>
+      <div className="text-[10px] text-text-tertiary">Token {connection.tokenStatus === 'VALID' ? 'válido' : connection.tokenStatus.toLowerCase()} • Health {connection.lastHealthAt ? new Date(connection.lastHealthAt).toLocaleString('pt-BR') : 'pendente'} • Templates {connection.lastTemplateSyncAt ? new Date(connection.lastTemplateSyncAt).toLocaleString('pt-BR') : 'não sincronizados'}{connection.lastErrorCode ? ` • Erro ${connection.lastErrorCode}` : ''}</div>
       <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || !connection.isActive} onClick={() => sync(connection.id)} className="rounded-lg border border-border-subtle px-3 py-1.5 text-white disabled:opacity-50">Sincronizar templates</button><button type="button" disabled={busy || !connection.isActive} onClick={() => disconnect(connection.id)} className="rounded-lg border border-red-400/20 px-3 py-1.5 text-red-300 disabled:opacity-50">Desconectar</button></div>
       {connection.templates.length > 0 && <div className="overflow-x-auto"><table className="w-full text-left text-[10px]"><thead className="text-text-tertiary"><tr><th className="py-2">Template</th><th>Idioma</th><th>Categoria</th><th>Status</th></tr></thead><tbody>{connection.templates.map((template) => <tr key={template.id} className="border-t border-border-subtle"><td className="py-2 text-white">{template.name}</td><td>{template.language}</td><td>{template.category}</td><td>{template.status}</td></tr>)}</tbody></table></div>}
     </div>)}

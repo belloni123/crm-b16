@@ -29,6 +29,7 @@ export class MetaGraphClient {
 
   async request<T>(path: string, init: RequestInit & { safeRetry?: boolean } = {}): Promise<T> {
     if (!path.startsWith("/")) throw new Error("META_GRAPH_PATH_INVALID");
+    if (!/^v\d+\.\d+$/.test(META_GRAPH_API_VERSION)) throw new Error("META_GRAPH_VERSION_INVALID");
     const method = (init.method || "GET").toUpperCase();
     const attempts = init.safeRetry && method === "GET" ? 3 : 1;
     const correlationId = randomUUID();
@@ -42,6 +43,7 @@ export class MetaGraphClient {
             accept: "application/json",
             ...(init.body ? { "content-type": "application/json" } : {}),
             ...(this.accessToken ? { authorization: `Bearer ${this.accessToken}` } : {}),
+            "user-agent": "CLAVE-CRM-MetaPilot/2A",
             ...init.headers,
           },
           signal: controller.signal,

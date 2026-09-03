@@ -45,6 +45,6 @@ export function metaMessageContent(message: MetaMessage) {
   if (media) return { type: (message.type || "unknown").toUpperCase(), content: media.caption || media.filename || `[${message.type}]`, mediaId: media.id };
   if (message.type === "location") return { type: "LOCATION", content: JSON.stringify(message.location || {}) };
   if (message.type === "contacts") return { type: "CONTACTS", content: "[contatos]" };
-  if (["interactive", "button", "reaction"].includes(message.type || "")) return { type: (message.type || "unknown").toUpperCase(), content: `[${message.type}]` };
+  if (["interactive", "button", "reaction", "order", "system", "unsupported"].includes(message.type || "")) return { type: (message.type || "unknown").toUpperCase(), content: `[${message.type}]` };
   return { type: "UNKNOWN", content: `[mensagem ${message.type || "desconhecida"}]` };
 }
