@@ -53,6 +53,13 @@ O arquivo de invariantes anterior e posterior teve o mesmo SHA-256: `15918028f13
 
 O residual não foi removido porque isso exigiria operações destrutivas. A coluna `stageId` histórica está nullable; as quatro colunas não são mapeadas pelo Prisma atual e não bloqueiam a aplicação.
 
+O portão automatizado `scripts/check-prisma-drift.ts`, introduzido na Fase 1C.1,
+aceita esse residual somente pelas instruções SQL exatas que removeriam os dois FKs
+e as quatro colunas históricas. A única outra exceção é o `DROP INDEX` nominal do
+índice único parcial de mensagens, que é gerenciado por migration SQL porque o
+predicado `WHERE ... IS NOT NULL` não é representável no Prisma 5. Qualquer outra
+diferença de FK, índice, nulabilidade, default, relação de tenant ou coluna falha a CI.
+
 ## Scripts versionados
 
 - `scripts/db/capture-catalog.sql`: catálogo sem dados de negócio;

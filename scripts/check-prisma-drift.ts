@@ -34,12 +34,20 @@ async function main() {
     { encoding: "utf8", env: process.env },
   );
   const statements = executableStatements(output);
-  const allowed = new Set([`DROP INDEX "${PARTIAL_INDEX}"`]);
+  // This allowlist is intentionally statement-exact. The three Lead statements are
+  // the non-destructive residual accepted in Phase 1A for empty historical replay;
+  // the partial index is managed by SQL because Prisma cannot model its predicate.
+  const allowed = new Set([
+    `DROP INDEX "${PARTIAL_INDEX}"`,
+    'ALTER TABLE "Lead" DROP CONSTRAINT "Lead_lostStatusId_fkey"',
+    'ALTER TABLE "Lead" DROP CONSTRAINT "Lead_stageId_fkey"',
+    'ALTER TABLE "Lead" DROP COLUMN "lostStatusId", DROP COLUMN "stageId", DROP COLUMN "status", DROP COLUMN "value"',
+  ]);
   const unauthorized = statements.filter((statement) => !allowed.has(statement));
   if (unauthorized.length > 0) {
     throw new Error(`Unauthorized Prisma drift detected:\n${unauthorized.join(";\n")}`);
   }
-  process.stdout.write(`Prisma drift gate passed (${statements.length} documented unmanaged partial index statement).\n`);
+  process.stdout.write(`Prisma drift gate passed (${statements.length} strictly allowlisted historical/unmanaged statements).\n`);
 }
 
 main().catch((error) => {
