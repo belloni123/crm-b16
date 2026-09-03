@@ -6,7 +6,7 @@ CREATE TABLE "MetaOnboardingSession" (
   "channelConnectionId" TEXT, "stateHash" TEXT NOT NULL, "nonceHash" TEXT NOT NULL,
   "status" TEXT NOT NULL DEFAULT 'PENDING', "expiresAt" TIMESTAMP(3) NOT NULL,
   "usedAt" TIMESTAMP(3), "errorCode" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "MetaOnboardingSession_pkey" PRIMARY KEY ("id")
 );
 CREATE TABLE "ChannelTemplate" (
@@ -14,7 +14,7 @@ CREATE TABLE "ChannelTemplate" (
   "providerTemplateId" TEXT, "name" TEXT NOT NULL, "language" TEXT NOT NULL,
   "category" TEXT NOT NULL, "status" TEXT NOT NULL, "componentsJson" TEXT NOT NULL,
   "componentsHash" TEXT NOT NULL, "lastSyncedAt" TIMESTAMP(3) NOT NULL,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "ChannelTemplate_pkey" PRIMARY KEY ("id")
 );
 CREATE TABLE "MessageDeliveryEvent" (
@@ -36,7 +36,7 @@ CREATE INDEX "MetaOnboardingSession_expiresAt_idx" ON "MetaOnboardingSession"("e
 CREATE UNIQUE INDEX "ChannelTemplate_channelConnectionId_name_language_key" ON "ChannelTemplate"("channelConnectionId", "name", "language");
 CREATE INDEX "ChannelTemplate_projectId_status_name_idx" ON "ChannelTemplate"("projectId", "status", "name");
 CREATE UNIQUE INDEX "MessageDeliveryEvent_channelConnectionId_externalEventKey_key" ON "MessageDeliveryEvent"("channelConnectionId", "externalEventKey");
-CREATE INDEX "MessageDeliveryEvent_channelConnectionId_providerMessageId_createdAt_idx" ON "MessageDeliveryEvent"("channelConnectionId", "providerMessageId", "createdAt");
+CREATE INDEX "MDE_connection_provider_created_idx" ON "MessageDeliveryEvent"("channelConnectionId", "providerMessageId", "createdAt");
 CREATE INDEX "MessageDeliveryEvent_projectId_messageId_createdAt_idx" ON "MessageDeliveryEvent"("projectId", "messageId", "createdAt");
 CREATE INDEX "DataDeletionRequest_requesterHash_createdAt_idx" ON "DataDeletionRequest"("requesterHash", "createdAt");
 CREATE INDEX "DataDeletionRequest_status_createdAt_idx" ON "DataDeletionRequest"("status", "createdAt");

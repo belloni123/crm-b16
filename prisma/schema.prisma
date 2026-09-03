@@ -643,7 +643,7 @@ model MessageDeliveryEvent {
   createdAt           DateTime          @default(now())
 
   @@unique([channelConnectionId, externalEventKey])
-  @@index([channelConnectionId, providerMessageId, createdAt])
+  @@index([channelConnectionId, providerMessageId, createdAt], map: "MDE_connection_provider_created_idx")
   @@index([projectId, messageId, createdAt])
 }
 
