@@ -52,6 +52,7 @@ export function TasksPanel({ projectId, initialTasks, leads }: TasksPanelProps) 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [dueTime, setDueTime] = useState('');
   const [leadId, setLeadId] = useState('');
 
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -63,7 +64,7 @@ export function TasksPanel({ projectId, initialTasks, leads }: TasksPanelProps) 
       const created = await createTask(projectId, {
         title,
         description: description || undefined,
-        dueDate: dueDate || undefined,
+        dueDate: dueDate ? (dueTime ? `${dueDate}T${dueTime}` : dueDate) : undefined,
         leadId: leadId || undefined
       });
 
@@ -83,6 +84,7 @@ export function TasksPanel({ projectId, initialTasks, leads }: TasksPanelProps) 
       setTitle('');
       setDescription('');
       setDueDate('');
+      setDueTime('');
       setLeadId('');
     } catch (err) {
       console.error(err);
@@ -168,7 +170,7 @@ export function TasksPanel({ projectId, initialTasks, leads }: TasksPanelProps) 
                         {task.dueDate && (
                           <span className="flex items-center gap-1 font-semibold text-orange-400">
                             <Calendar className="h-3.5 w-3.5" />
-                            Vence em: {new Date(task.dueDate).toLocaleDateString('pt-BR')}
+                            Vence em: {new Date(task.dueDate).toLocaleDateString('pt-BR')} às {new Date(task.dueDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         )}
                         {task.lead && (
@@ -280,14 +282,26 @@ export function TasksPanel({ projectId, initialTasks, leads }: TasksPanelProps) 
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-text-secondary uppercase">Data de Vencimento</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent"
-            />
+          <div className="flex gap-2">
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-[10px] font-semibold text-text-secondary uppercase">Data de Vencimento</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent"
+              />
+            </div>
+            <div className="flex flex-col gap-1 w-28">
+              <label className="text-[10px] font-semibold text-text-secondary uppercase">Horário</label>
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                disabled={!dueDate}
+                className="bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-accent disabled:opacity-40"
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1">

@@ -6,6 +6,26 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID;
 const MICROSOFT_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET;
 
+const SAO_PAULO_TIMEZONE = 'America/Sao_Paulo';
+
+/**
+ * Formata um Date como data/hora local de São Paulo ("YYYY-MM-DDTHH:mm:ss"),
+ * para ser enviado junto com o campo timeZone nas APIs de calendário.
+ */
+function toSaoPauloDateTimeString(date: Date): string {
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: SAO_PAULO_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date);
+  return parts.replace(' ', 'T');
+}
+
 // Retorna a URL base dinamicamente se o NEXTAUTH_URL não estiver configurado
 function getAppBaseUrl() {
   const url = process.env.NEXTAUTH_URL || 'https://crm.nofrontscale.com.br';
@@ -235,12 +255,12 @@ export async function syncTaskToGoogleCalendar(
       summary: `CRM: ${task.title}`,
       description: task.description || 'Tarefa sincronizada do CRM No Front Scale.',
       start: {
-        dateTime: startDate.toISOString(),
-        timeZone: 'America/Sao_Paulo',
+        dateTime: toSaoPauloDateTimeString(startDate),
+        timeZone: SAO_PAULO_TIMEZONE,
       },
       end: {
-        dateTime: endDate.toISOString(),
-        timeZone: 'America/Sao_Paulo',
+        dateTime: toSaoPauloDateTimeString(endDate),
+        timeZone: SAO_PAULO_TIMEZONE,
       },
     };
 
@@ -308,12 +328,12 @@ export async function syncTaskToMicrosoftCalendar(
         content: task.description || 'Tarefa sincronizada do CRM No Front Scale.',
       },
       start: {
-        dateTime: startDate.toISOString(),
-        timeZone: 'America/Sao_Paulo',
+        dateTime: toSaoPauloDateTimeString(startDate),
+        timeZone: SAO_PAULO_TIMEZONE,
       },
       end: {
-        dateTime: endDate.toISOString(),
-        timeZone: 'America/Sao_Paulo',
+        dateTime: toSaoPauloDateTimeString(endDate),
+        timeZone: SAO_PAULO_TIMEZONE,
       },
     };
 

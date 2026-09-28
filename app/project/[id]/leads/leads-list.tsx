@@ -174,6 +174,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
   const [newComment, setNewComment] = useState('');
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDue, setNewTaskDue] = useState('');
+  const [newTaskTime, setNewTaskTime] = useState('');
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [editingCustomFields, setEditingCustomFields] = useState<Record<string, string>>({});
   const [isSavingCustomFields, setIsSavingCustomFields] = useState(false);
@@ -291,11 +292,12 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
     try {
       await createTask(projectId, {
         title: newTaskTitle,
-        dueDate: newTaskDue || undefined,
+        dueDate: newTaskDue ? (newTaskTime ? `${newTaskDue}T${newTaskTime}` : newTaskDue) : undefined,
         leadId: selectedLeadId
       });
       setNewTaskTitle('');
       setNewTaskDue('');
+      setNewTaskTime('');
       loadLeadDetails(selectedLeadId);
     } catch (err) {
       console.error(err);
@@ -1507,7 +1509,14 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
                         type="date"
                         value={newTaskDue}
                         onChange={(e) => setNewTaskDue(e.target.value)}
-                        className="flex-1 bg-bg-base border border-border-subtle rounded px-2 py-1 text-xs text-white outline-none"
+                        className="flex-1 min-w-0 bg-bg-base border border-border-subtle rounded px-2 py-1 text-xs text-white outline-none"
+                      />
+                      <input
+                        type="time"
+                        value={newTaskTime}
+                        onChange={(e) => setNewTaskTime(e.target.value)}
+                        disabled={!newTaskDue}
+                        className="w-24 bg-bg-base border border-border-subtle rounded px-2 py-1 text-xs text-white outline-none disabled:opacity-40"
                       />
                       <button
                         type="submit"
@@ -1548,7 +1557,7 @@ export function LeadsList({ projectId, initialLeads, tags, origins, lostStatuses
                               {task.dueDate && (
                                 <span className="text-[9px] text-orange-400 mt-1 flex items-center gap-1 font-semibold">
                                   <Calendar className="h-3.5 w-3.5" />
-                                  {new Date(task.dueDate).toLocaleDateString('pt-BR')}
+                                  {new Date(task.dueDate).toLocaleDateString('pt-BR')} às {new Date(task.dueDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               )}
                             </div>

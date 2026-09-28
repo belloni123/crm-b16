@@ -178,6 +178,7 @@ export function KanbanBoard({
   const [newComment, setNewComment] = useState('');
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDue, setNewTaskDue] = useState('');
+  const [newTaskTime, setNewTaskTime] = useState('');
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [editingCustomFields, setEditingCustomFields] = useState<Record<string, string>>({});
   const [isSavingCustomFields, setIsSavingCustomFields] = useState(false);
@@ -451,11 +452,12 @@ export function KanbanBoard({
     try {
       await createTask(projectId, {
         title: newTaskTitle,
-        dueDate: newTaskDue || undefined,
+        dueDate: newTaskDue ? (newTaskTime ? `${newTaskDue}T${newTaskTime}` : newTaskDue) : undefined,
         leadId: selectedLeadId
       });
       setNewTaskTitle('');
       setNewTaskDue('');
+      setNewTaskTime('');
       loadLeadDetails(selectedLeadId);
       
       // Atualiza contador de tarefas no card principal
@@ -1318,7 +1320,14 @@ export function KanbanBoard({
                         type="date"
                         value={newTaskDue}
                         onChange={(e) => setNewTaskDue(e.target.value)}
-                        className="flex-1 bg-bg-base border border-border-subtle rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-accent"
+                        className="flex-1 min-w-0 bg-bg-base border border-border-subtle rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-accent"
+                      />
+                      <input
+                        type="time"
+                        value={newTaskTime}
+                        onChange={(e) => setNewTaskTime(e.target.value)}
+                        disabled={!newTaskDue}
+                        className="w-24 bg-bg-base border border-border-subtle rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-accent disabled:opacity-40"
                       />
                       <button
                         type="submit"
@@ -1362,7 +1371,7 @@ export function KanbanBoard({
                               {task.dueDate && (
                                 <span className="text-[10px] text-orange-400 mt-1 flex items-center gap-1 font-semibold">
                                   <Calendar className="h-3 w-3" />
-                                  {new Date(task.dueDate).toLocaleDateString('pt-BR')}
+                                  {new Date(task.dueDate).toLocaleDateString('pt-BR')} às {new Date(task.dueDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               )}
                             </div>

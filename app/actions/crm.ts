@@ -44,6 +44,16 @@ import {
   type IncomingWebhookField,
 } from '@/lib/incoming-webhooks';
 
+/**
+ * Converte o valor do formulário ("YYYY-MM-DD" ou "YYYY-MM-DDTHH:mm") para um Date,
+ * interpretando-o sempre no horário de Brasília (America/Sao_Paulo, UTC-3).
+ * Quando só a data é informada, assume 09:00.
+ */
+function parseTaskDueDate(value: string): Date {
+  const normalized = value.length === 10 ? `${value}T09:00` : value;
+  return new Date(`${normalized}:00-03:00`);
+}
+
 // ==========================================
 // FUNIS E ESTÁGIOS
 // ==========================================
@@ -1193,7 +1203,7 @@ export async function createTask(
     data: {
       title: data.title,
       description: data.description || null,
-      dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      dueDate: data.dueDate ? parseTaskDueDate(data.dueDate) : null,
       status: data.status || 'PENDING',
       leadId: data.leadId || null,
       projectId,
@@ -1249,7 +1259,7 @@ export async function updateTask(
   if (data.status !== undefined) updateData.status = data.status;
   if (data.userId !== undefined) updateData.userId = data.userId;
   if (data.dueDate !== undefined) {
-    updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    updateData.dueDate = data.dueDate ? parseTaskDueDate(data.dueDate) : null;
   }
 
   const task = await prisma.task.update({

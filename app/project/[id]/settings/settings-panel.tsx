@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { 
   createStage, 
+  updateStage,
   deleteStage,
   reorderStages,
   createTag,
@@ -65,7 +66,8 @@ import {
   Palette,
   GripVertical,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Pencil
 } from 'lucide-react';
 
 interface Stage {
@@ -618,6 +620,8 @@ ${fieldsHtml}
   // Form de Estágio
   const [newStageName, setNewStageName] = useState('');
   const [newStageColor, setNewStageColor] = useState('#9FE870');
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [editingStageName, setEditingStageName] = useState('');
 
   // Form de Tag
   const [newTagName, setNewTagName] = useState('');
@@ -755,6 +759,30 @@ ${fieldsHtml}
       setNewStageName('');
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  const handleRenameStage = async (e: React.FormEvent, stage: Stage) => {
+    e.preventDefault();
+    if (!editingStageName.trim()) return;
+    setIsPending(true);
+    try {
+      const updated = await updateStage(projectId, stage.id, {
+        name: editingStageName.trim(),
+        color: stage.color,
+        order: stage.order
+      });
+      setStages(stages.map(s => s.id === stage.id ? { ...s, name: updated.name } : s));
+      setPipelineList(pipelineList.map((pipeline) => pipeline.id === selectedPipeline?.id
+        ? { ...pipeline, stages: stages.map(s => s.id === stage.id ? { ...s, name: updated.name } : s) }
+        : pipeline));
+      setEditingStageId(null);
+      setEditingStageName('');
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Erro ao renomear o estágio.');
     } finally {
       setIsPending(false);
     }
@@ -1412,12 +1440,53 @@ ${fieldsHtml}
                         draggedStageId === stage.id ? 'border-accent opacity-60' : 'border-border-subtle'
                       }`}
                     >
-                      <div className="flex items-center gap-2 text-white font-semibold">
-                        <GripVertical className="h-4 w-4 text-text-tertiary cursor-grab" aria-hidden="true" />
-                        <span className="h-3 w-3 rounded-full border border-black/20" style={{ backgroundColor: stage.color }} />
-                        {stage.name}
+                      <div className="flex items-center gap-2 text-white font-semibold flex-1 min-w-0">
+                        <GripVertical className="h-4 w-4 text-text-tertiary cursor-grab flex-shrink-0" aria-hidden="true" />
+                        <span className="h-3 w-3 rounded-full border border-black/20 flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                        {editingStageId === stage.id ? (
+                          <form onSubmit={(e) => handleRenameStage(e, stage)} className="flex gap-2 items-center flex-1 min-w-0">
+                            <input
+                              required
+                              autoFocus
+                              type="text"
+                              value={editingStageName}
+                              onChange={(e) => setEditingStageName(e.target.value)}
+                              className="bg-bg-base border border-border-subtle rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-accent flex-1 min-w-0 max-w-xs"
+                            />
+                            <button
+                              type="submit"
+                              disabled={isPending}
+                              className="px-2.5 py-1 bg-accent hover:bg-accent-light text-black font-bold text-[10px] rounded-lg transition-all cursor-pointer"
+                            >
+                              Salvar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingStageId(null);
+                                setEditingStageName('');
+                              }}
+                              className="px-2.5 py-1 bg-glass-5 hover:bg-[rgba(255,255,255,0.1)] text-white font-bold text-[10px] rounded-lg transition-all cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                          </form>
+                        ) : (
+                          stage.name
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingStageId(stage.id);
+                            setEditingStageName(stage.name);
+                          }}
+                          className="text-text-tertiary hover:text-white p-1 cursor-pointer"
+                          aria-label={`Renomear ${stage.name}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
                         <button
                           type="button"
                           disabled={index === 0 || isPending}
