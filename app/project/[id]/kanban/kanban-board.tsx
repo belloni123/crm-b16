@@ -39,7 +39,8 @@ import {
   FileText,
   Loader2,
   CheckSquare,
-  ExternalLink
+  ExternalLink,
+  RotateCcw
 } from 'lucide-react';
 
 interface Tag {
@@ -179,6 +180,12 @@ export function KanbanBoard({
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDue, setNewTaskDue] = useState('');
   const [newTaskTime, setNewTaskTime] = useState('');
+
+  // Reativação de lead fechado/perdido (agendar retorno para outro estágio)
+  const [returnStageId, setReturnStageId] = useState('');
+  const [returnDate, setReturnDate] = useState('');
+  const [returnTime, setReturnTime] = useState('');
+  const [isSchedulingReturn, setIsSchedulingReturn] = useState(false);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [editingCustomFields, setEditingCustomFields] = useState<Record<string, string>>({});
   const [isSavingCustomFields, setIsSavingCustomFields] = useState(false);
@@ -464,6 +471,63 @@ export function KanbanBoard({
       setLeads(leads.map(l => l.id === selectedLeadId ? { ...l, tasks: [...l.tasks, { id: 'new' }] } : l));
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // ==========================================
+  // REATIVAÇÃO DE LEAD (FECHADO/PERDIDO)
+  // ==========================================
+
+  // Lead está "encerrado" quando a participação foi perdida ou está em um estágio de fechamento (ganho)
+  const isLeadClosed = !!activeEntry && (
+    activeEntry.status === 'LOST' || /fechado/i.test(activeEntry.stage?.name || '')
+  );
+
+  const handleScheduleReturn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!returnStageId || !returnDate || !selectedLeadId || !activePipeline) return;
+    setIsSchedulingReturn(true);
+
+    try {
+      // Move o lead de volta para o estágio escolhido, reativando a participação
+      await updateLead(projectId, selectedLeadId, {
+        stageId: returnStageId,
+        status: 'ACTIVE',
+        lostStatusId: null,
+        pipelineId: activePipeline.id
+      });
+
+      const stageName = activeStages.find(s => s.id === returnStageId)?.name || 'estágio escolhido';
+
+      // Cria o evento/tarefa de retorno vinculado ao lead (sincroniza com a agenda)
+      await createTask(projectId, {
+        title: `Retorno: ${leadDetail.name} → ${stageName}`,
+        dueDate: returnTime ? `${returnDate}T${returnTime}` : returnDate,
+        leadId: selectedLeadId
+      });
+
+      // Atualiza o estado local do board
+      setLeads(leads.map(l => l.id === selectedLeadId
+        ? {
+            ...l,
+            tasks: [...l.tasks, { id: 'new' }],
+            pipelineEntries: l.pipelineEntries.map((entry: any) =>
+              entry.pipelineId === activePipeline.id
+                ? { ...entry, status: 'ACTIVE', stageId: returnStageId, lostStatusId: null }
+                : entry
+            )
+          }
+        : l
+      ));
+
+      setReturnStageId('');
+      setReturnDate('');
+      setReturnTime('');
+      loadLeadDetails(selectedLeadId);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSchedulingReturn(false);
     }
   };
 
@@ -1304,6 +1368,51 @@ export function KanbanBoard({
                     <CheckSquare className="h-4 w-4" />
                     Ações & Tarefas
                   </h3>
+
+                  {/* Reativação: visível apenas para leads fechados (ganho) ou perdidos */}
+                  {isLeadClosed && (
+                    <form onSubmit={handleScheduleReturn} className="mb-4 p-3.5 rounded-xl bg-accent/5 border border-accent/30 space-y-2 flex-shrink-0">
+                      <p className="text-[10px] font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Agendar Retorno (Reativar Lead)
+                      </p>
+                      <select
+                        required
+                        value={returnStageId}
+                        onChange={(e) => setReturnStageId(e.target.value)}
+                        className="w-full bg-bg-base border border-border-subtle rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-accent"
+                      >
+                        <option value="">Voltar para o estágio...</option>
+                        {activeStages
+                          .filter(s => s.id !== activeEntry?.stageId)
+                          .map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                      </select>
+                      <div className="flex gap-2">
+                        <input
+                          required
+                          type="date"
+                          value={returnDate}
+                          onChange={(e) => setReturnDate(e.target.value)}
+                          className="flex-1 min-w-0 bg-bg-base border border-border-subtle rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-accent"
+                        />
+                        <input
+                          type="time"
+                          value={returnTime}
+                          onChange={(e) => setReturnTime(e.target.value)}
+                          className="w-24 bg-bg-base border border-border-subtle rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-accent"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isSchedulingReturn}
+                        className="w-full py-1.5 bg-accent hover:bg-accent-light text-black font-bold text-xs rounded-lg cursor-pointer disabled:opacity-50"
+                      >
+                        {isSchedulingReturn ? 'Agendando...' : 'Reativar e Agendar'}
+                      </button>
+                    </form>
+                  )}
 
                   {/* Formulário rápida de nova Tarefa */}
                   <form onSubmit={handleAddTask} className="mb-4 space-y-2 flex-shrink-0">

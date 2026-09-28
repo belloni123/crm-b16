@@ -10,8 +10,13 @@ import {
   Sparkles,
   AlertTriangle,
   Compass,
-  Frown
+  Frown,
+  CalendarClock,
+  User
 } from 'lucide-react';
+
+// Nomes de estágio considerados "fechamento (ganho)" para métricas de conversão
+const WON_STAGE_NAMES = ['Fechado (Ganho)', 'Fechado'];
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -52,6 +57,26 @@ export default async function ProjectDashboardPage({ params }: Props) {
     where: { projectId, status: { in: ['PENDING', 'IN_PROGRESS'] } },
   });
 
+  // Eventos/Tarefas agendados para hoje (horário de Brasília)
+  const spToday = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const todayStart = new Date(`${spToday}T00:00:00-03:00`);
+  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+  const todayEvents = await prisma.task.findMany({
+    where: {
+      projectId,
+      status: { in: ['PENDING', 'IN_PROGRESS'] },
+      dueDate: { gte: todayStart, lt: todayEnd },
+    },
+    include: { lead: { select: { name: true } } },
+    orderBy: { dueDate: 'asc' },
+  });
+
   // Cálculo de taxa de conversão (Leads Ganhas / Total Histórico de Leads)
   const wonLeadsCount = await prisma.lead.count({
     where: { 
@@ -59,7 +84,7 @@ export default async function ProjectDashboardPage({ params }: Props) {
       pipelineEntries: {
         some: {
           stage: {
-            name: { in: ['Fechado (Ganho)', 'Fechado'] }
+            name: { in: WON_STAGE_NAMES }
           }
         }
       }
@@ -98,15 +123,17 @@ export default async function ProjectDashboardPage({ params }: Props) {
     };
   });
 
-  // 4. Distribuição de Leads por Origem (adendo)
+  // 4. Distribuição de Leads por Origem + Fechamento por Origem
   const originsData = await prisma.origin.findMany({
     where: { projectId },
     include: {
       leads: {
-        where: {
+        select: {
+          id: true,
           pipelineEntries: {
-            some: {
-              status: 'ACTIVE'
+            select: {
+              status: true,
+              stage: { select: { name: true } }
             }
           }
         }
@@ -114,32 +141,49 @@ export default async function ProjectDashboardPage({ params }: Props) {
     }
   });
 
-  // Contagem de leads sem origem cadastrada
-  const leadsWithoutOriginCount = await prisma.lead.count({
-    where: {
-      projectId,
-      originId: null,
+  // Leads sem origem cadastrada
+  const leadsWithoutOrigin = await prisma.lead.findMany({
+    where: { projectId, originId: null },
+    select: {
+      id: true,
       pipelineEntries: {
-        some: {
-          status: 'ACTIVE'
+        select: {
+          status: true,
+          stage: { select: { name: true } }
         }
       }
     }
   });
 
-  const originBreakdown = originsData.map(origin => ({
-    id: origin.id,
-    name: origin.name,
-    count: origin.leads.length
-  }));
+  type OriginLead = {
+    id: string;
+    pipelineEntries: { status: string; stage: { name: string } }[];
+  };
 
-  if (leadsWithoutOriginCount > 0) {
-    originBreakdown.push({
-      id: 'none',
-      name: 'Sem Origem Especificada',
-      count: leadsWithoutOriginCount
-    });
+  const buildOriginStats = (id: string, name: string, originLeads: OriginLead[]) => {
+    const total = originLeads.length;
+    const active = originLeads.filter(l => l.pipelineEntries.some(e => e.status === 'ACTIVE')).length;
+    const won = originLeads.filter(l => l.pipelineEntries.some(e => WON_STAGE_NAMES.includes(e.stage.name))).length;
+    return {
+      id,
+      name,
+      count: active,
+      total,
+      won,
+      rate: total > 0 ? (won / total) * 100 : 0
+    };
+  };
+
+  const originBreakdown = originsData.map(origin => buildOriginStats(origin.id, origin.name, origin.leads));
+
+  if (leadsWithoutOrigin.length > 0) {
+    originBreakdown.push(buildOriginStats('none', 'Sem Origem Especificada', leadsWithoutOrigin));
   }
+
+  // Ranking de fechamento por origem (maiores primeiro)
+  const originClosingRanking = [...originBreakdown]
+    .filter(item => item.total > 0)
+    .sort((a, b) => b.won - a.won || b.rate - a.rate);
 
   // 5. Relatório de Oportunidades Perdidas por Motivo (adendo)
   const lostReasonsData = await prisma.lostStatus.findMany({
@@ -193,6 +237,47 @@ export default async function ProjectDashboardPage({ params }: Props) {
             Métricas de desempenho e saúde comercial do seu projeto.
           </p>
         </div>
+      </div>
+
+      {/* Destaque: Eventos de Hoje */}
+      <div className="bg-glass-1 border border-accent/40 rounded-xl p-5 shadow-xl">
+        <h4 className="text-sm font-bold font-display text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-accent" />
+          Eventos de Hoje
+          <span className="text-[10px] font-bold text-black bg-accent px-2 py-0.5 rounded-full">
+            {todayEvents.length}
+          </span>
+        </h4>
+
+        {todayEvents.length === 0 ? (
+          <p className="text-xs text-text-secondary py-2 text-center">
+            Nenhum evento agendado para hoje.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {todayEvents.map((task) => (
+              <div
+                key={task.id}
+                className="bg-glass-2 border border-border-subtle rounded-lg p-3.5 flex flex-col gap-1.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold text-accent bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-full">
+                    {task.dueDate
+                      ? new Date(task.dueDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
+                      : '--:--'}
+                  </span>
+                  {task.lead && (
+                    <span className="text-[10px] text-text-secondary flex items-center gap-1 truncate">
+                      <User className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">{task.lead.name}</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-bold text-white leading-snug">{task.title}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Grid de Cards Métricas (Totalizadores) */}
@@ -302,28 +387,39 @@ export default async function ProjectDashboardPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Painel 2: Origens de Leads */}
+        {/* Painel 2: Origens de Leads com Fechamento */}
         <div className="bg-glass-1 border border-border-subtle rounded-xl p-6 shadow-xl flex flex-col justify-between">
           <div>
             <h4 className="text-sm font-bold font-display text-white uppercase tracking-wider mb-5 flex items-center gap-2">
               <Compass className="h-4 w-4 text-accent" />
-              Origem dos Leads
+              Fechamento por Origem
             </h4>
-            <div className="space-y-3">
-              {originBreakdown.length === 0 ? (
+            <div className="space-y-4">
+              {originClosingRanking.length === 0 ? (
                 <p className="text-xs text-text-secondary py-4 text-center">Nenhuma origem mapeada.</p>
               ) : (
-                originBreakdown.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between text-xs border-b border-[rgba(255,255,255,0.03)] pb-2 last:border-0 last:pb-0">
-                    <span className="text-text-secondary">{item.name}</span>
-                    <span className="font-bold text-white bg-glass-3 px-2 py-0.5 rounded border border-border-subtle">
-                      {item.count}
-                    </span>
+                originClosingRanking.map((item) => (
+                  <div key={item.id} className="space-y-1.5">
+                    <div className="flex justify-between text-xs font-semibold gap-2">
+                      <span className="text-white truncate">{item.name}</span>
+                      <span className="text-text-secondary whitespace-nowrap">
+                        <span className="text-accent-light font-bold">{item.won}</span> de {item.total} • {item.rate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-glass-4 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent rounded-full transition-all duration-500"
+                        style={{ width: `${item.rate}%` }}
+                      />
+                    </div>
                   </div>
                 ))
               )}
             </div>
           </div>
+          <p className="text-[10px] text-text-secondary mt-4 pt-3 border-t border-border-subtle">
+            Ganhos por origem sobre o total histórico de leads da origem.
+          </p>
         </div>
 
       </div>
