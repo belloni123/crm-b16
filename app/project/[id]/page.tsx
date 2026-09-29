@@ -99,29 +99,34 @@ export default async function ProjectDashboardPage({ params }: Props) {
     ? ((wonLeadsCount / totalLeadsHistorical) * 100).toFixed(1)
     : '0.0';
 
-  // 3. Distribuição de Leads por Estágios
-  const stagesData = await prisma.stage.findMany({
-    where: { pipeline: { projectId } },
-    orderBy: { order: 'asc' },
+  // 3. Distribuição de Leads por Estágios (agrupado por funil)
+  const pipelinesData = await prisma.pipeline.findMany({
+    where: { projectId },
+    orderBy: { name: 'asc' },
     include: {
-      pipelineEntries: {
-        where: { status: 'ACTIVE' },
-        select: { value: true }
+      stages: {
+        orderBy: { order: 'asc' },
+        include: {
+          pipelineEntries: {
+            where: { status: 'ACTIVE' },
+            select: { value: true }
+          }
+        }
       }
     }
   });
 
-  const stageBreakdown = stagesData.map(stage => {
-    const count = stage.pipelineEntries.length;
-    const value = stage.pipelineEntries.reduce((sum, entry) => sum + entry.value, 0);
-    return {
+  const pipelineBreakdown = pipelinesData.map(pipeline => ({
+    id: pipeline.id,
+    name: pipeline.name,
+    stages: pipeline.stages.map(stage => ({
       id: stage.id,
       name: stage.name,
       color: stage.color,
-      count,
-      value
-    };
-  });
+      count: stage.pipelineEntries.length,
+      value: stage.pipelineEntries.reduce((sum, entry) => sum + entry.value, 0)
+    }))
+  }));
 
   // 4. Distribuição de Leads por Origem + Fechamento por Origem
   const originsData = await prisma.origin.findMany({
@@ -352,34 +357,49 @@ export default async function ProjectDashboardPage({ params }: Props) {
               <TrendingUp className="h-4 w-4 text-accent" />
               Volume por Estágio do Funil
             </h4>
-            <div className="space-y-4">
-              {stageBreakdown.map((stage) => {
-                // Calcula percentual para a barra de progresso
-                const maxLeads = Math.max(...stageBreakdown.map(s => s.count), 1);
-                const percent = ((stage.count / maxLeads) * 100);
+            <div className="space-y-6">
+              {pipelineBreakdown.map((pipeline) => {
+                // Calcula percentual para a barra de progresso dentro do próprio funil
+                const maxLeads = Math.max(...pipeline.stages.map(s => s.count), 1);
 
                 return (
-                  <div key={stage.id} className="space-y-1">
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span className="flex items-center gap-2 text-white">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: stage.color }} />
-                        {stage.name}
+                  <div key={pipeline.id} className="space-y-4">
+                    {/* Nome do funil (separador visual quando há mais de um) */}
+                    <h5 className="text-[10px] font-bold text-accent uppercase tracking-widest border-b border-border-subtle pb-2 flex items-center justify-between">
+                      <span>{pipeline.name}</span>
+                      <span className="text-text-secondary normal-case tracking-normal font-semibold">
+                        {pipeline.stages.reduce((sum, s) => sum + s.count, 0)} leads ativos
                       </span>
-                      <span className="text-text-secondary">
-                        {stage.count} {stage.count === 1 ? 'lead' : 'leads'} • <span className="text-accent-light font-bold">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(stage.value)}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full bg-glass-4 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-500" 
-                        style={{ 
-                          width: `${percent}%`, 
-                          backgroundColor: stage.color 
-                        }}
-                      />
-                    </div>
+                    </h5>
+
+                    {pipeline.stages.map((stage) => {
+                      const percent = ((stage.count / maxLeads) * 100);
+
+                      return (
+                        <div key={stage.id} className="space-y-1">
+                          <div className="flex justify-between text-xs font-semibold">
+                            <span className="flex items-center gap-2 text-white">
+                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: stage.color }} />
+                              {stage.name}
+                            </span>
+                            <span className="text-text-secondary">
+                              {stage.count} {stage.count === 1 ? 'lead' : 'leads'} • <span className="text-accent-light font-bold">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(stage.value)}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full bg-glass-4 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full rounded-full transition-all duration-500" 
+                              style={{ 
+                                width: `${percent}%`, 
+                                backgroundColor: stage.color 
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
